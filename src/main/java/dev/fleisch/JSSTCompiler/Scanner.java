@@ -99,9 +99,10 @@ public class Scanner {
             // Check if a valid keyword was retrieved, throw error otherwise
             if (validKeyword != null) {
                 // Skip comments multiline, catch trailing ends
-                try {
-                    // Skip comments (multiline)
-                    if (validKeyword == Keyword.START_COMMENT_MULTI_LINE) {
+
+                // Skip comments (multiline)
+                if (validKeyword == Keyword.START_COMMENT_MULTI_LINE) {
+                    try {
                         // Read symbol until *\
                         while (true) {
                             currentCharacter = input.next();
@@ -115,11 +116,12 @@ public class Scanner {
                                 }
                             }
                         }
-                        // Return symbol after comment
-                        return nextSymbol();
+
+                    } catch (EOFException e) {
+                        throw new ScannerException("Unclosed comment at Line: " + input.getLine() + " Char: " + input.getPosition());
                     }
-                } catch (EOFException e) {
-                    throw new ScannerException("Unclosed comment at Line: " + input.getLine() + " Char: " + input.getPosition());
+                    // Return symbol after comment
+                    return nextSymbol();
                 }
 
                 // Skip comments (single line)
