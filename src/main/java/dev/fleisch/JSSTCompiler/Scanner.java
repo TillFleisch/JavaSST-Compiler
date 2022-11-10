@@ -35,6 +35,9 @@ public class Scanner {
      */
     public Symbol<?> nextSymbol() throws ScannerException, IOException {
 
+        if (!input.available())
+            throw new EOFException();
+
         skipIrrelevant();
 
         // Check if the current character is a digit -> start of a number
@@ -43,7 +46,11 @@ public class Scanner {
             while (isDigit(currentCharacter)) {
                 // Convert character to
                 number = number * 10 + currentCharacter - '0';
-                currentCharacter = input.next();
+                try {
+                    currentCharacter = input.next();
+                } catch (EOFException e) {
+                    break;
+                }
             }
             return new Symbol<>(number);
         }
@@ -55,7 +62,11 @@ public class Scanner {
             StringBuilder substringBuilder = new StringBuilder();
             while (isLetter(currentCharacter) || isDigit(currentCharacter)) {
                 substringBuilder.append(currentCharacter);
-                currentCharacter = input.next();
+                try {
+                    currentCharacter = input.next();
+                } catch (EOFException e) {
+                    break;
+                }
             }
 
             String substring = substringBuilder.toString();
@@ -93,7 +104,11 @@ public class Scanner {
                 }
 
                 // Continue with the next character
-                currentCharacter = input.next();
+                try {
+                    currentCharacter = input.next();
+                } catch (EOFException e) {
+                    break;
+                }
             }
 
             // Check if a valid keyword was retrieved, throw error otherwise
@@ -111,7 +126,6 @@ public class Scanner {
                             if (currentCharacter == '*') {
                                 currentCharacter = input.next();
                                 if (currentCharacter == '/') {
-                                    currentCharacter = input.next();
                                     break;
                                 }
                             }
@@ -120,6 +134,7 @@ public class Scanner {
                     } catch (EOFException e) {
                         throw new ScannerException("Unclosed comment at Line: " + input.getLine() + " Char: " + input.getPosition());
                     }
+                    currentCharacter = input.next();
                     // Return symbol after comment
                     return nextSymbol();
                 }
@@ -240,6 +255,24 @@ class Symbol<T> {
         if (this.content instanceof Integer)
             return Type.NUMBER;
         return Type.UNKNOWN;
+    }
+
+    /**
+     * Check if two Symbols are equivalent
+     *
+     * @param other Object
+     * @return True if other is an equivalent symbol to this
+     */
+    @Override
+    public boolean equals(Object other) {
+        if (other instanceof Symbol<?>) {
+            if (((Symbol<?>) other).getType().equals(getType())) {
+                return ((Symbol<?>) other).content.equals(content);
+            } else {
+                return false;
+            }
+        }
+        return false;
     }
 
     /**
