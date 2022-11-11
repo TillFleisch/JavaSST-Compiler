@@ -26,6 +26,11 @@ public class Input {
     private int position = 0;
 
     /**
+     * Determines if input is available
+     */
+    private boolean available = true;
+
+    /**
      * Creates a Input object for a given JavaSST source file
      *
      * @param filePath Path pointing to a JavaSST source file
@@ -36,13 +41,20 @@ public class Input {
     }
 
     /**
+     * Creates a Input object for a given JavaSST input stream
+     */
+    public Input(InputStream inputStream) {
+        this.inputStream = inputStream;
+    }
+
+    /**
      * Reads the next character available on the input file.
      *
      * @return Next file
      * @throws IOException If reading fails, or EOF has been reached.
      */
     public char next() throws IOException {
-        if (inputStream.available() != 0) {
+        if (available && inputStream.available() != 0) {
             char c = (char) inputStream.read();
 
             // Increase position and line to keep track of the streams position
@@ -54,9 +66,19 @@ public class Input {
 
             return c;
         } else {
+            available = false;
             inputStream.close();
             throw new EOFException();
         }
+    }
+
+    /**
+     * Determines if the input is available
+     *
+     * @return true if the input is still available
+     */
+    public boolean available(){
+        return available;
     }
 
     /**

@@ -210,6 +210,24 @@ public class Scanner {
         return (c >= 'a' && c <= 'z') ||
                 (c >= 'A' && c <= 'Z');
     }
+
+    /**
+     * Passes the input's line nr forward
+     *
+     * @return The scanners line nr within the source file
+     */
+    public int getLine() {
+        return input.getLine();
+    }
+
+    /**
+     * Passes the input's position forward
+     *
+     * @return The scanners position within the source file
+     */
+    public int getPosition() {
+        return input.getPosition();
+    }
 }
 
 /**
@@ -237,7 +255,7 @@ class Symbol<T> {
     @Override
     public String toString() {
         if (content != null)
-            return "Type: " + getType() + " Content: " + content.toString();
+            return getType() + ": " + content.toString();
         else
             return "Type: " + getType();
     }
