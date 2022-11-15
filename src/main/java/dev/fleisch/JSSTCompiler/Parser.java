@@ -3,6 +3,7 @@ package dev.fleisch.JSSTCompiler;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.logging.Logger;
 
 /**
@@ -42,7 +43,9 @@ public class Parser {
      **/
     public void parse() throws ParserException, ScannerException, IOException {
         try {
-            parseClass();
+            SymbolTable symbolTable = new SymbolTable();
+            Objekt.Clasz clasz = parseClass();
+            symbolTable.add(clasz);
         } catch (EOFException e) {
             throw new ParserException("Unexpected EOF");
         }
@@ -70,11 +73,16 @@ public class Parser {
 
     /**
      * Parse arbitrary identifiers
+     *
+     * @return The parsed identifier
      */
-    private void parseIdentifier() throws ParserException.ExpectedButFoundException, ScannerException, IOException {
+    private String parseIdentifier() throws ParserException.ExpectedButFoundException, ScannerException, IOException {
         if (!currentSymbol.getType().equals(Symbol.Type.IDENTIFIER))
             throw new ParserException.ExpectedButFoundException(Symbol.Type.IDENTIFIER, currentSymbol, scanner);
+
+        String identifier = (String) currentSymbol.content;
         next();
+        return identifier;
     }
 
     /**
@@ -359,18 +367,22 @@ public class Parser {
      * <p>
      * "{" {local_declarations} statement_sequence "}"
      * </p>
+     *
+     * @return The SymbolTable used within this body
      */
-    private void parseMethodBody() throws ScannerException, IOException, ParserException {
+    private SymbolTable parseMethodBody(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
+        SymbolTable symbolTable = new SymbolTable(enclosingTable);
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
 
         // Check for local declarations -> possible types -> not possible statement
         while (!isEligibleForStatement()) {
-            parseLocalDeclaration();
+            symbolTable.add(parseLocalDeclaration());
         }
 
         parseStatementSequence();
 
         assertKeyword(Keyword.CURLY_CLOSING_BRACKET);
+        return symbolTable;
     }
 
     /**
@@ -378,12 +390,15 @@ public class Parser {
      * <p>
      * type identifier ;
      * </p>
+     *
+     * @return The parsed local declaration
      */
-    private void parseLocalDeclaration() throws ScannerException, IOException,
+    private Objekt.Parameter parseLocalDeclaration() throws ScannerException, IOException,
             ParserException {
-        parseType();
-        parseIdentifier();
+        Type type = parseType();
+        String identifier = parseIdentifier();
         assertKeyword(Keyword.SEMICOLON);
+        return new Objekt.Parameter(identifier, type);
     }
 
     /**
@@ -391,11 +406,13 @@ public class Parser {
      * <p>
      * "int"
      * </p>
+     *
+     * @return The parsed Type
      */
-    private void parseType() throws ScannerException, IOException, ParserException {
+    private Type parseType() throws ScannerException, IOException, ParserException {
         if (currentSymbol.equals(new Symbol<>(Keyword.INT))) {
             next();
-            return;
+            return Type.INT;
         }
         throw new ParserException("Expected type declaration", scanner);
     }
@@ -406,10 +423,15 @@ public class Parser {
      * <p>
      * method_head method_body
      * </p>
+     *
+     * @return The parsed method declaration
      */
-    private void parseMethodDeclaration() throws ScannerException, IOException, ParserException {
-        parseMethodHead();
-        parseMethodBody();
+    private Objekt.Procedure parseMethodDeclaration(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
+
+        Objekt.Procedure procedure = parseMethodHead();
+        procedure.setSymbolTable(parseMethodBody(enclosingTable));
+
+        return procedure;
     }
 
     /**
@@ -417,13 +439,17 @@ public class Parser {
      * <p>
      * "public" method_type identifier formal_parameters
      * </p>
+     *
+     * @return The Procedure described by this method head without a body
      */
 
-    private void parseMethodHead() throws ScannerException, IOException, ParserException {
+    private Objekt.Procedure parseMethodHead() throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.PUBLIC);
-        parseMethodType();
-        parseIdentifier();
-        parseFormalParameters();
+        Type type = parseMethodType();
+        String identifier = parseIdentifier();
+        LinkedList<Objekt.Parameter> parameters = parseFormalParameters();
+
+        return new Objekt.Procedure(identifier, parameters, type);
     }
 
     /**
@@ -431,14 +457,16 @@ public class Parser {
      * <p>
      * "void" | type
      * </p>
+     *
+     * @return The methods type
      */
-    private void parseMethodType() throws ScannerException, IOException,
+    private Type parseMethodType() throws ScannerException, IOException,
             ParserException {
         if (currentSymbol.equals(new Symbol<>(Keyword.VOID))) {
             assertKeyword(Keyword.VOID);
-            return;
+            return Type.VOID;
         }
-        parseType();
+        return parseType();
     }
 
     /**
@@ -446,23 +474,28 @@ public class Parser {
      * <p>
      * "(" [ fp_section {"," fp_section}] ")"
      * </p>
+     *
+     * @return List of formal parameters
      */
-    private void parseFormalParameters() throws ScannerException, IOException,
+    private LinkedList<Objekt.Parameter> parseFormalParameters() throws ScannerException, IOException,
             ParserException {
         assertKeyword(Keyword.ROUND_OPENING_BRACKET);
 
+        LinkedList<Objekt.Parameter> parameters = new LinkedList<>();
         // Check for formal parameter section
         if (!currentSymbol.equals(new Symbol<>(Keyword.ROUND_CLOSING_BRACKET))) {
-            parseFormalParameterSection();
+            parameters.add(parseFormalParameterSection());
 
             // Parse further comma separated sections
             while (currentSymbol.equals(new Symbol<>(Keyword.COMMA))) {
                 assertKeyword(Keyword.COMMA);
-                parseFormalParameterSection();
+                parameters.add(parseFormalParameterSection());
             }
         }
 
         assertKeyword(Keyword.ROUND_CLOSING_BRACKET);
+
+        return parameters;
     }
 
     /**
@@ -470,11 +503,14 @@ public class Parser {
      * <p>
      * type identifier
      * </p>
+     *
+     * @return The single formal parameter which was parsed
      */
-    private void parseFormalParameterSection() throws ScannerException, IOException,
+    private Objekt.Parameter parseFormalParameterSection() throws ScannerException, IOException,
             ParserException {
-        parseType();
-        parseIdentifier();
+        Type type = parseType();
+        String identifier = parseIdentifier();
+        return new Objekt.Parameter(identifier, type);
     }
 
     /**
@@ -484,31 +520,42 @@ public class Parser {
      * { type identifier ";"}
      * { method_declaration }
      * </p>
+     *
+     * @return Symbol table containing all parsed CONSTANTS, PARAMETERS and METHODS
      */
-    private void parseDeclarations() throws ScannerException, IOException, ParserException {
+    private SymbolTable parseDeclarations() throws ScannerException, IOException, ParserException {
+        SymbolTable symbolTable = new SymbolTable();
 
         // check for { "final" type identifier "=" expression ";" }
         while (currentSymbol.equals(new Symbol<>(Keyword.FINAL))) {
             assertKeyword(Keyword.FINAL);
-            parseType();
-            parseIdentifier();
+
+            Type type = parseType();
+            String identifier = parseIdentifier();
+
             assertKeyword(Keyword.ASSIGN);
-            parseExpression();
+            parseExpression(); // TODO: determine expression value using AST
+
+            symbolTable.push(new Objekt.Constant(identifier, type, 0));
             assertKeyword(Keyword.SEMICOLON);
         }
 
         // check for { type identifier ";" }
         // This checks for all possible types, not elegant
         while (currentSymbol.equals(new Symbol<>(Keyword.INT))) {
-            parseType();
-            parseIdentifier();
+            Type type = parseType();
+            String identifier = parseIdentifier();
+
+            symbolTable.push(new Objekt.Parameter(identifier, type));
             assertKeyword(Keyword.SEMICOLON);
         }
 
         // { method_declaration }
         while (currentSymbol.equals(new Symbol<>(Keyword.PUBLIC))) {
-            parseMethodDeclaration();
+            symbolTable.push(parseMethodDeclaration(symbolTable));
         }
+
+        return symbolTable;
     }
 
     /**
@@ -516,11 +563,13 @@ public class Parser {
      * <p>
      * "{" declarations "}"
      * </p>
+     *
+     * @return The symbolTable contained within this class body
      */
-    private void parseClassBody() throws ScannerException, IOException, ParserException {
+    private SymbolTable parseClassBody() throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
 
-        parseDeclarations();
+        SymbolTable symbolTable = parseDeclarations();
 
         try {
             if (!currentSymbol.equals(new Symbol<>(Keyword.CURLY_CLOSING_BRACKET)))
@@ -529,6 +578,8 @@ public class Parser {
         } catch (EOFException ignored) {
             // EOF is fine, since nothing is expected after curly closing bracket
         }
+
+        return symbolTable;
     }
 
     /**
@@ -537,10 +588,12 @@ public class Parser {
      * "class" identifier classbody
      * </p>
      */
-    private void parseClass() throws ScannerException, IOException, ParserException {
+    private Objekt.Clasz parseClass() throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.CLASS);
-        parseIdentifier();
-        parseClassBody();
+        String identifier = parseIdentifier();
+        SymbolTable symbolTable = parseClassBody();
+
+        return new Objekt.Clasz(identifier,symbolTable);
     }
 
     /**
@@ -603,9 +656,9 @@ public class Parser {
                         i=1;
                         } ;""")).parseStatementSequence();
 
-                new Parser(temporaryScanner("{i=0;} ;")).parseMethodBody();
-                new Parser(temporaryScanner("{int i; i=0;} ;")).parseMethodBody();
-                new Parser(temporaryScanner("{int i; int j; i=0; j=meth();} ;")).parseMethodBody();
+                new Parser(temporaryScanner("{i=0;} ;")).parseMethodBody(new SymbolTable());
+                new Parser(temporaryScanner("{int i; i=0;} ;")).parseMethodBody(new SymbolTable());
+                new Parser(temporaryScanner("{int i; int j; i=0; j=meth();} ;")).parseMethodBody(new SymbolTable());
 
                 new Parser(temporaryScanner("() ;")).parseFormalParameters();
                 new Parser(temporaryScanner("(int i) ;")).parseFormalParameters();
@@ -615,8 +668,8 @@ public class Parser {
                 new Parser(temporaryScanner("public void meth(int i) ;")).parseMethodHead();
 
                 new Parser(temporaryScanner("public int meth(){int i; int j; i=0; j=meth();} ;"))
-                        .parseMethodDeclaration();
-                new Parser(temporaryScanner("public void meth(){i=0;} ;")).parseMethodDeclaration();
+                        .parseMethodDeclaration(new SymbolTable());
+                new Parser(temporaryScanner("public void meth(){i=0;} ;")).parseMethodDeclaration(new SymbolTable());
 
                 new Parser(temporaryScanner("final int i = 0; ;")).parseDeclarations();
                 new Parser(temporaryScanner("final int i = 0; final int i = 0; ;")).parseDeclarations();
