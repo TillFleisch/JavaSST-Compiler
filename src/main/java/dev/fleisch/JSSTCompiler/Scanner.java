@@ -187,7 +187,7 @@ public class Scanner {
      * @return True if the character is considered a whitespace
      */
     private boolean isWhitespace(char c) {
-        return c == ' ' || c == '\n' || c == '\r';
+        return c == ' '|| c == '\t' || c == '\n' || c == '\r';
     }
 
     /**
