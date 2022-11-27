@@ -117,6 +117,10 @@ public abstract class Objekt {
          */
         SymbolTable symbolTable;
 
+        /**
+         * The AST contained within this Procedure call
+         */
+        Node abstractSyntaxTree;
 
         /**
          * Constructor for Procedure Objects.
@@ -151,6 +155,15 @@ public abstract class Objekt {
          */
         public void setSymbolTable(SymbolTable symbolTable) {
             this.symbolTable = symbolTable;
+        }
+
+        /**
+         * Sets the syntax tree contained within this procedure
+         *
+         * @param abstractSyntaxTree the syntax tree contained within this procedure
+         */
+        public void setAbstractSyntaxTree(Node abstractSyntaxTree) {
+            this.abstractSyntaxTree = abstractSyntaxTree;
         }
     }
 

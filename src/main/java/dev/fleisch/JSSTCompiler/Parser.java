@@ -86,12 +86,17 @@ public class Parser {
     }
 
     /**
-     * Parse arbitrary numbers
+     * Parse arbitrary numbers.
+     * Since JavaSST only uses integers we return integers.
+     *
+     * @return Number parsed
      */
-    private void parseNumber() throws ParserException.ExpectedButFoundException, ScannerException, IOException {
+    private int parseNumber() throws ParserException.ExpectedButFoundException, ScannerException, IOException {
         if (!currentSymbol.getType().equals(Symbol.Type.NUMBER))
             throw new ParserException.ExpectedButFoundException(Symbol.Type.NUMBER, currentSymbol, scanner);
+        int number = (int) currentSymbol.content;
         next();
+        return number;
     }
 
     /**
@@ -99,32 +104,33 @@ public class Parser {
      * <p>
      * identifier | number | "(" expression ")" | intern_procedure_call
      * </p>
+     *
+     * @return Syntax tree describing the parsed factor
      */
-    private void parseFactor() throws ScannerException, IOException, ParserException {
-
+    private Node parseFactor() throws ScannerException, IOException, ParserException {
 
         if (currentSymbol.getType() == Symbol.Type.NUMBER) {
-            parseNumber();
-            return;
+            return new Node.ConstantNode(parseNumber());
         }
 
         if (currentSymbol.getType() == Symbol.Type.IDENTIFIER) {
-            parseIdentifier();
+            String identifier = parseIdentifier();
             // differentiate stand-alone identifiers and procedure calls
             if (currentSymbol.equals(new Symbol<>(Keyword.ROUND_OPENING_BRACKET))) {
-                parseActualParameters();
+                Node.StatementSequenceNode parameters = parseActualParameters();
+                return new Node.ProcedureCallNode(identifier, parameters);
             }
-            return;
+            return new Node.IdentifierNode(identifier);
         }
 
         if (currentSymbol.equals(new Symbol<>(Keyword.ROUND_OPENING_BRACKET))) {
             assertKeyword(Keyword.ROUND_OPENING_BRACKET);
 
             // Parse expression
-            parseExpression();
+            Node subExpression = parseExpression();
 
             assertKeyword(Keyword.ROUND_CLOSING_BRACKET);
-            return;
+            return subExpression;
         }
 
         throw new ParserException("invalid factor", scanner);
@@ -140,11 +146,15 @@ public class Parser {
      * </p>
      * <p>
      * Internal procedure calls are parsed directly
+     *
+     * @return Procedure call Node with identifier and parameters
      */
-    private void parseProcedureCall() throws ScannerException, ParserException, IOException {
-        parseIdentifier();
-        parseActualParameters();
+    private Node.ProcedureCallNode parseProcedureCall() throws ScannerException, ParserException, IOException {
+        String identifier = parseIdentifier();
+        Node.StatementSequenceNode parameters = parseActualParameters();
         assertKeyword(Keyword.SEMICOLON);
+
+        return new Node.ProcedureCallNode(identifier, parameters);
     }
 
     /**
@@ -153,8 +163,11 @@ public class Parser {
      * <p>
      * "(" [ expression {, expression}] ")"
      * </p>
+     *
+     * @return Syntax tree describing the parsed parameters for method invocations
      */
-    private void parseActualParameters() throws ScannerException, IOException, ParserException {
+    private Node.StatementSequenceNode parseActualParameters() throws ScannerException, IOException, ParserException {
+        LinkedList<Node> parameters = new LinkedList<>();
 
         assertKeyword(Keyword.ROUND_OPENING_BRACKET);
 
@@ -162,12 +175,12 @@ public class Parser {
         if (!currentSymbol.equals(new Symbol<>(Keyword.ROUND_CLOSING_BRACKET))) {
             // must be expression potentially followed by more expressions
             try {
-                parseExpression();
+                parameters.add(parseExpression());
 
-                // parse further comma separated paramters
+                // parse further comma separated parameters
                 while (currentSymbol.equals(new Symbol<>(Keyword.COMMA))) {
                     assertKeyword(Keyword.COMMA);
-                    parseExpression();
+                    parameters.add(parseExpression());
                 }
             } catch (ParserException e) {
                 throw new ParserException("Bad Procedure call parameters", scanner);
@@ -175,6 +188,9 @@ public class Parser {
         }
 
         assertKeyword(Keyword.ROUND_CLOSING_BRACKET);
+
+        // Return the list of parameters
+        return new Node.StatementSequenceNode(parameters);
     }
 
     /**
@@ -182,10 +198,12 @@ public class Parser {
      * <p>
      * simple_expression [("==" | "<" | "<=" | ">" | ">=") simple_expression]
      * </p>
+     *
+     * @return Syntax tree describing the parsed expression
      */
-    private void parseExpression() throws ScannerException, IOException, ParserException {
+    private Node parseExpression() throws ScannerException, IOException, ParserException {
 
-        parseSimpleExpression();
+        Node firstExpression = parseSimpleExpression();
 
         // Parse optional second simple expression
         if (currentSymbol.equals(new Symbol<>(Keyword.EQUAL)) ||
@@ -193,9 +211,22 @@ public class Parser {
                 currentSymbol.equals(new Symbol<>(Keyword.LESS_EQUAL)) ||
                 currentSymbol.equals(new Symbol<>(Keyword.GREATER)) ||
                 currentSymbol.equals(new Symbol<>(Keyword.GREATER_EQUAL))) {
+            Operation.Binary binaryOperation;
+            try {
+                // Determine the binary Operation
+                binaryOperation = Operation.Binary.toBinaryOperation((Keyword) currentSymbol.content);
+            } catch (ParserException e) {
+                throw new ParserException(e.getMessage(), scanner);
+            }
             next();
-            parseSimpleExpression();
+
+            Node secondExpression = parseSimpleExpression();
+
+            // Return the simple expression as a binary operation with LHS and RHS subexpressions.
+            return new Node.BinaryOperationNode(firstExpression, secondExpression, binaryOperation);
         }
+
+        return firstExpression;
     }
 
     /**
@@ -203,16 +234,29 @@ public class Parser {
      * <p>
      * term {("+"|"-") term}
      * </p>
+     *
+     * @return Syntax tree describing the parsed simple expression
      */
-    private void parseSimpleExpression() throws ScannerException, IOException, ParserException {
+    private Node parseSimpleExpression() throws ScannerException, IOException, ParserException {
 
-        parseTerm();
-
-        while (currentSymbol.equals(new Symbol<>(Keyword.PLUS)) ||
+        Node firstTerm = parseTerm();
+        if (currentSymbol.equals(new Symbol<>(Keyword.PLUS)) ||
                 currentSymbol.equals(new Symbol<>(Keyword.MINUS))) {
+            Operation.Binary binaryOperation;
+            try {
+                // Determine the binary Operation
+                binaryOperation = Operation.Binary.toBinaryOperation((Keyword) currentSymbol.content);
+            } catch (ParserException e) {
+                throw new ParserException(e.getMessage(), scanner);
+            }
             next();
-            parseTerm();
+
+            // Resolve subsequent operand recursively
+            Node secondTerm = parseSimpleExpression();
+
+            return new Node.BinaryOperationNode(firstTerm, secondTerm, binaryOperation);
         }
+        return firstTerm;
     }
 
     /**
@@ -220,16 +264,29 @@ public class Parser {
      * <p>
      * factor {("*"|"/") factor}
      * </p>
+     *
+     * @return Syntax tree describing the parsed term
      */
-    private void parseTerm() throws ScannerException, IOException, ParserException {
+    private Node parseTerm() throws ScannerException, IOException, ParserException {
 
-        parseFactor();
+        Node firstFactor = parseFactor();
 
-        while (currentSymbol.equals(new Symbol<>(Keyword.MULTIPLY)) ||
+        if (currentSymbol.equals(new Symbol<>(Keyword.MULTIPLY)) ||
                 currentSymbol.equals(new Symbol<>(Keyword.DIVIDE))) {
+            Operation.Binary binaryOperation;
+            try {
+                // Determine the binary Operation
+                binaryOperation =
+                        Operation.Binary.toBinaryOperation((Keyword) currentSymbol.content);
+            } catch (ParserException e) {
+                throw new ParserException(e.getMessage(), scanner);
+            }
             next();
-            parseFactor();
+            // Determine subsequent terms recursively
+            Node secondFactor = parseTerm();
+            return new Node.BinaryOperationNode(firstFactor, secondFactor, binaryOperation);
         }
+        return firstFactor;
     }
 
     /**
@@ -239,45 +296,44 @@ public class Parser {
      * </p>
      * <p>
      * This method includes assignment and procedure call parsing, since they share their starting symbols
+     *
+     * @return Syntax tree describing the parsed Statement
      */
-    private void parseStatement() throws ScannerException, IOException, ParserException {
+    private Node parseStatement() throws ScannerException, IOException, ParserException {
         // Check for if statement
         if (currentSymbol.equals(new Symbol<>(Keyword.IF))) {
-            parseIf();
-            return;
+            return parseIf();
         }
 
         // Check for while statement
         if (currentSymbol.equals(new Symbol<>(Keyword.WHILE))) {
-            parseWhile();
-            return;
+            return parseWhile();
         }
 
         // Check for return statement
         if (currentSymbol.equals(new Symbol<>(Keyword.RETURN))) {
-            parseReturn();
-            return;
+            return parseReturn();
         }
 
         // Check for identifier (assignment and procedure call)
         if (currentSymbol.getType() == Symbol.Type.IDENTIFIER) {
-            parseIdentifier();
+            String identifier = parseIdentifier();
 
             // Check for assignment
             // identifier "=" expression ";"
             if (currentSymbol.equals(new Symbol<>(Keyword.ASSIGN))) {
                 assertKeyword(Keyword.ASSIGN);
-                parseExpression();
+                Node assignment = parseExpression();
                 assertKeyword(Keyword.SEMICOLON);
-                return;
+                return new Node.BinaryOperationNode(new Node.IdentifierNode(identifier), assignment, Operation.Binary.ASSIGNMENT);
             }
 
             // Check for procedure call
             // identifier actual_parameters ";"
             if (currentSymbol.equals(new Symbol<>(Keyword.ROUND_OPENING_BRACKET))) {
-                parseActualParameters();
+                Node.StatementSequenceNode parameters = parseActualParameters();
                 assertKeyword(Keyword.SEMICOLON);
-                return;
+                return new Node.ProcedureCallNode(identifier, parameters);
             }
 
             throw new ParserException("Expected assignment or procedure call!", scanner);
@@ -290,17 +346,20 @@ public class Parser {
      * <p>
      * "return" [simple_expression] ";"
      * </p>
+     *
+     * @return Syntax tree describing the parsed return statement
      */
-    private void parseReturn() throws ScannerException, IOException, ParserException {
+    private Node parseReturn() throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.RETURN);
 
         // Check for optional parameters
         if (!currentSymbol.equals(new Symbol<>(Keyword.SEMICOLON))) {
-            parseSimpleExpression();
+            Node expression = parseSimpleExpression();
             assertKeyword(Keyword.SEMICOLON);
-            return;
+            return new Node.UnaryOperationNode(expression, Operation.Unary.RETURN);
         }
         assertKeyword(Keyword.SEMICOLON);
+        return new Node.UnaryOperationNode(null, Operation.Unary.RETURN);
     }
 
     /**
@@ -308,19 +367,24 @@ public class Parser {
      * <p>
      * "while" "(" expression ")" "{" statement_sequence "}"
      * </p>
+     *
+     * @return Syntax tree describing the parsed if statement
      */
-    private void parseWhile() throws ScannerException, IOException, ParserException {
+    private Node.WhileNode parseWhile() throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.WHILE);
         assertKeyword(Keyword.ROUND_OPENING_BRACKET);
+        Node condition;
         try {
-            parseExpression();
+            condition = parseExpression();
             assertKeyword(Keyword.ROUND_CLOSING_BRACKET);
         } catch (ParserException e) {
             throw new ParserException("Bad while-condition", scanner);
         }
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
-        parseStatementSequence();
+        Node.StatementSequenceNode node = parseStatementSequence();
         assertKeyword(Keyword.CURLY_CLOSING_BRACKET);
+
+        return new Node.StatementSequenceNode.WhileNode(condition, node);
     }
 
     /**
@@ -328,23 +392,28 @@ public class Parser {
      * <p>
      * "if" "(" expression ")" "{" statement_sequence "}" "else" "{" statement_sequence "}"
      * </p>
+     *
+     * @return Syntax tree describing the parsed if statement
      */
-    private void parseIf() throws ScannerException, IOException, ParserException {
+    private Node.IfNode parseIf() throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.IF);
         assertKeyword(Keyword.ROUND_OPENING_BRACKET);
+        Node condition;
         try {
-            parseExpression();
+            condition = parseExpression();
             assertKeyword(Keyword.ROUND_CLOSING_BRACKET);
         } catch (ParserException e) {
             throw new ParserException("Bad if-condition", scanner);
         }
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
-        parseStatementSequence();
+        Node.StatementSequenceNode ifStatements = parseStatementSequence();
         assertKeyword(Keyword.CURLY_CLOSING_BRACKET);
         assertKeyword(Keyword.ELSE);
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
-        parseStatementSequence();
+        Node.StatementSequenceNode elseStatements = parseStatementSequence();
         assertKeyword(Keyword.CURLY_CLOSING_BRACKET);
+
+        return new Node.IfNode(condition, ifStatements, elseStatements);
     }
 
     /**
@@ -352,14 +421,20 @@ public class Parser {
      * <p>
      * statement {statement}
      * </p>
+     *
+     * @return Syntax tree describing the parsed if statement
      */
-    private void parseStatementSequence() throws ScannerException, IOException, ParserException {
-        parseStatement();
+    private Node.StatementSequenceNode parseStatementSequence() throws ScannerException, IOException, ParserException {
+        LinkedList<Node> statementNodes = new LinkedList<>();
+
+        statementNodes.add(parseStatement());
 
         // Check for possible statement
         // (assign, procedure-call) identifier | if | while | return
         while (isEligibleForStatement())
-            parseStatement();
+            statementNodes.add(parseStatement());
+
+        return new Node.StatementSequenceNode(statementNodes);
     }
 
     /**
@@ -370,7 +445,7 @@ public class Parser {
      *
      * @return The SymbolTable used within this body
      */
-    private SymbolTable parseMethodBody(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
+    private Pair<SymbolTable, Node> parseMethodBody(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
         SymbolTable symbolTable = new SymbolTable(enclosingTable);
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
 
@@ -379,10 +454,10 @@ public class Parser {
             symbolTable.add(parseLocalDeclaration());
         }
 
-        parseStatementSequence();
+        Node methodAST = parseStatementSequence();
 
         assertKeyword(Keyword.CURLY_CLOSING_BRACKET);
-        return symbolTable;
+        return new Pair<>(symbolTable, methodAST);
     }
 
     /**
@@ -429,7 +504,9 @@ public class Parser {
     private Objekt.Procedure parseMethodDeclaration(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
 
         Objekt.Procedure procedure = parseMethodHead();
-        procedure.setSymbolTable(parseMethodBody(enclosingTable));
+        Pair<SymbolTable, Node> pair = parseMethodBody(enclosingTable);
+        procedure.setSymbolTable(pair.first);
+        procedure.setAbstractSyntaxTree(pair.second);
 
         return procedure;
     }
@@ -534,9 +611,11 @@ public class Parser {
             String identifier = parseIdentifier();
 
             assertKeyword(Keyword.ASSIGN);
-            parseExpression(); // TODO: determine expression value using AST
 
-            symbolTable.push(new Objekt.Constant(identifier, type, 0));
+            // Assume the expression is a constant, try to evaluate it
+            int value = parseExpression().evaluateConstantExpression();
+
+            symbolTable.push(new Objekt.Constant(identifier, type, value));
             assertKeyword(Keyword.SEMICOLON);
         }
 
@@ -593,7 +672,7 @@ public class Parser {
         String identifier = parseIdentifier();
         SymbolTable symbolTable = parseClassBody();
 
-        return new Objekt.Clasz(identifier,symbolTable);
+        return new Objekt.Clasz(identifier, symbolTable);
     }
 
     /**
@@ -608,6 +687,28 @@ public class Parser {
                 currentSymbol.equals(new Symbol<>(Keyword.RETURN));
     }
 
+    /**
+     * Generic pair of 2 objects
+     *
+     * @param <T1> Type of first object
+     * @param <T2> Type of second object
+     * @author TillFleisch
+     */
+    public static class Pair<T1, T2> {
+        T1 first;
+        T2 second;
+
+        /**
+         * Generic-pair constructor
+         *
+         * @param first  first object T1
+         * @param second second object of type T2
+         */
+        public Pair(T1 first, T2 second) {
+            this.first = first;
+            this.second = second;
+        }
+    }
 
     /**
      * Class for simple parser Tests
