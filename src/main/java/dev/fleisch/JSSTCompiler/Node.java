@@ -365,16 +365,11 @@ public abstract class Node {
      */
     public String toDot() throws Exception {
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("digraph ");
-        stringBuilder.append(hashCode());
-        stringBuilder.append("{\n");
+        stringBuilder.append("subgraph ").append(hashCode()).append("{\n");
 
         // Traverse graph and retrieve Node information
         traverse(child -> {
-            stringBuilder.append(child.hashCode());
-            stringBuilder.append(" [label=\"");
-            stringBuilder.append(child);
-            stringBuilder.append("\"");
+            stringBuilder.append(child.hashCode()).append(" [label=\"").append(child).append("\"");
             // Shape nodes according to type
             if (child instanceof Node.IfNode || child instanceof Node.WhileNode) {
                 stringBuilder.append("shape=diamond");
@@ -396,17 +391,11 @@ public abstract class Node {
 
             // Add left and right sub-graphs
             if (child.left != null) {
-                stringBuilder.append(child.hashCode());
-                stringBuilder.append("->");
-                stringBuilder.append(child.left.hashCode());
-                stringBuilder.append("[color=green]\n");
+                stringBuilder.append(child.hashCode()).append("->").append(child.left.hashCode()).append("[color=green]\n");
             }
 
             if (child.right != null) {
-                stringBuilder.append(child.hashCode());
-                stringBuilder.append("->");
-                stringBuilder.append(child.right.hashCode());
-                stringBuilder.append("[color=red]\n");
+                stringBuilder.append(child.hashCode()).append("->").append(child.right.hashCode()).append("[color=red]\n");
             }
 
             // Add condition sub-graph edges for while/if

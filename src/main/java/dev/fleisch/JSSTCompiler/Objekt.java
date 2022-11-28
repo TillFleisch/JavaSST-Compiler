@@ -30,7 +30,7 @@ public abstract class Objekt {
         /**
          * The {@link SymbolTable} used within this class.
          */
-        SymbolTable symboltable;
+        SymbolTable symbolTable;
 
         /**
          * Class-Constructor with a given SymbolTable
@@ -40,7 +40,7 @@ public abstract class Objekt {
          */
         public Clasz(String name, SymbolTable symboltable) {
             super(name);
-            this.symboltable = symboltable;
+            this.symbolTable = symboltable;
         }
 
         @Override
@@ -48,6 +48,108 @@ public abstract class Objekt {
             if (obj instanceof Clasz)
                 return ((Clasz) obj).name.equals(name);
             return super.equals(obj);
+        }
+
+        public String toDot(boolean showIdentifierReferences, boolean showProcedureCallReferences,
+                            boolean linkProcedureASTs) throws Exception {
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.append("digraph ").append(hashCode()).append(" {\n");
+            stringBuilder.append("labelloc=\"top\";")
+                    .append("\nlabel=\"").append(name).append("\";\n")
+                    .append("compound=true;");
+
+            stringBuilder.append("subgraph cluster_declarations_").append(name).append(" {\n");
+            stringBuilder.append("label=\"Declarations ").append(name).append("\"\n");
+            for (Objekt objekt : symbolTable) {
+
+                // Add procedure as subgraph (scope)
+                if (objekt instanceof Procedure) {
+                    if (((Procedure) objekt).symbolTable.size() > 0) {
+                        stringBuilder.append("subgraph cluster_declarations_").append(objekt.hashCode()).append("{\n");
+                        stringBuilder.append("label=\"Declarations ").append(objekt).append("\";\n");
+
+                        // Add entries from local SymbolTable within the subgraph
+                        for (Objekt subObject : ((Procedure) objekt).symbolTable) {
+                            stringBuilder.append(subObject.hashCode()).append("[label=\"").append(subObject).append("\"];\n");
+                        }
+                        stringBuilder.append("}\n");
+                    } else {
+                        stringBuilder.append(objekt.hashCode()).append("[label=\"").append(objekt).append("\" shape=box];\n");
+                    }
+                } else {
+                    stringBuilder.append(objekt.hashCode()).append("[label=\"").append(objekt).append("\"];\n");
+                }
+            }
+            stringBuilder.append("}\n");
+
+            // generate basic AST for methods declared within the class
+            for (Objekt objekt : symbolTable) {
+                if (objekt instanceof Procedure) {
+                    stringBuilder.append("subgraph cluster_").append(objekt.hashCode()).append("{\n");
+                    stringBuilder.append("label=\"").append(objekt).append("\";\n");
+                    stringBuilder.append("color=purple\n");
+
+                    // generate AST graphs as usual
+                    stringBuilder.append(((Procedure) objekt).abstractSyntaxTree.toDot()).append("\n");
+
+                    stringBuilder.append("}\n");
+                    // traverse each graph and add symbol table references
+
+                    ((Procedure) objekt).abstractSyntaxTree.traverse(node -> {
+                        // Find reference if present
+                        if (showIdentifierReferences && node instanceof Node.IdentifierNode) {
+                            Objekt reference = ((Node.IdentifierNode) node).symbolTableEntry;
+                            // Add an edge from the current node to the referred declaration
+                            stringBuilder.append(node.hashCode()).append("->").append(reference.hashCode())
+                                    .append("[color=gray];\n");
+                        }
+                        if (showProcedureCallReferences && node instanceof Node.ProcedureCallNode) {
+                            Procedure reference = ((Node.ProcedureCallNode) node).symbolTableEntry;
+                            // Add an edge from the current node to the referred declaration
+                            if (reference.symbolTable.size() > 0) {
+                                // Point to first node within the methods declaration and cap the arrow at the
+                                // cluster bounding box
+                                stringBuilder.append(node.hashCode()).append("->")
+                                        .append(reference.symbolTable.get(0).hashCode())
+                                        .append("[color=orange ")
+                                        .append("lhead=\"cluster_declarations_").append(reference.hashCode())
+                                        .append("\"];\n");
+                            } else {
+                                stringBuilder.append(node.hashCode()).append("->").append(reference.hashCode())
+                                        .append("[color=orange];\n");
+                            }
+
+                        }
+
+                    });
+
+                    // Add an edge from the procedure definition to the ast
+                    if (linkProcedureASTs) {
+                        // If there is no node for a procedure (implicit box from cluster) pick the first element
+                        if (((Procedure) objekt).symbolTable.size() > 0) {
+                            stringBuilder.append(((Procedure) objekt).symbolTable.get(0).hashCode());
+                        } else {
+                            stringBuilder.append(objekt.hashCode());
+                        }
+                        stringBuilder.append("->").append(((Procedure) objekt).abstractSyntaxTree.hashCode())
+                                .append("[color=purple lhead=\"cluster_").append(objekt.hashCode());
+
+                        // If there is no node for a procedure cap at cluster box
+                        if (((Procedure) objekt).symbolTable.size() > 0) {
+                            stringBuilder.append("\" ltail=\"cluster_declarations_").append(objekt.hashCode());
+                        }
+                        stringBuilder.append("\"];\n");
+                    }
+                }
+            }
+
+            stringBuilder.append("}");
+            return stringBuilder.toString();
+        }
+
+        @Override
+        public String toString() {
+            return "Class: " + name;
         }
     }
 
@@ -79,17 +181,17 @@ public abstract class Objekt {
             }
             return super.equals(obj);
         }
+
+        @Override
+        public String toString() {
+            return "Variable/Parameter: " + name + "(" + type + ")";
+        }
     }
 
     /**
      * Class describing Constants
      */
-    static class Constant extends Objekt {
-
-        /**
-         * The constants Type
-         */
-        Type type;
+    static class Constant extends Parameter {
 
         /**
          * The constants value.
@@ -106,16 +208,13 @@ public abstract class Objekt {
          * @param value The constant's value
          */
         public Constant(String name, Type type, int value) {
-            super(name);
-            this.type = type;
+            super(name, type);
             this.value = value;
         }
 
-        public boolean equals(Object obj) {
-            if (obj instanceof Constant) {
-                return ((Constant) obj).name.equals(name) && ((Constant) obj).type.equals(type);
-            }
-            return super.equals(obj);
+        @Override
+        public String toString() {
+            return "Constant(final): " + name + "(" + type + "): " + value;
         }
     }
 
@@ -157,6 +256,9 @@ public abstract class Objekt {
             this.parameterList = parameterList;
             this.symbolTable = symbolTable;
             this.returnType = returnType;
+
+            // Add the parameters into the local SymbolTable
+            symbolTable.addAll(parameterList);
         }
 
         /**
@@ -196,6 +298,20 @@ public abstract class Objekt {
                 return (((Procedure) obj).name.equals(name) &&
                         ((Objekt.Procedure) obj).parameterList.size() == parameterList.size());
             return super.equals(obj);
+        }
+
+        @Override
+        public String toString() {
+            // fancy exception with corr. nr of parameters (JavaSST only supports a single type "int")
+            StringBuilder parameters = new StringBuilder("(");
+            int nrParameter = parameterList.size();
+            for (int i = 0; i < nrParameter; i++) {
+                parameters.append("int");
+                if (i < nrParameter - 1)
+                    parameters.append(",");
+            }
+            parameters.append(")");
+            return "Procedure: " + name + parameters;
         }
     }
 
