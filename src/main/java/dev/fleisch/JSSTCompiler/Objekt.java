@@ -42,6 +42,13 @@ public abstract class Objekt {
             super(name);
             this.symboltable = symboltable;
         }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof Clasz)
+                return ((Clasz) obj).name.equals(name);
+            return super.equals(obj);
+        }
     }
 
     /**
@@ -63,6 +70,14 @@ public abstract class Objekt {
         public Parameter(String name, Type type) {
             super(name);
             this.type = type;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof Parameter) {
+                return ((Parameter) obj).name.equals(name) && ((Parameter) obj).type.equals(type);
+            }
+            return super.equals(obj);
         }
     }
 
@@ -94,6 +109,13 @@ public abstract class Objekt {
             super(name);
             this.type = type;
             this.value = value;
+        }
+
+        public boolean equals(Object obj) {
+            if (obj instanceof Constant) {
+                return ((Constant) obj).name.equals(name) && ((Constant) obj).type.equals(type);
+            }
+            return super.equals(obj);
         }
     }
 
@@ -164,6 +186,16 @@ public abstract class Objekt {
          */
         public void setAbstractSyntaxTree(Node abstractSyntaxTree) {
             this.abstractSyntaxTree = abstractSyntaxTree;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof Procedure)
+                // We only need to check if the number of parameters is unique since JavaSST only supports a single type.
+                // Check for same name and parameter list size
+                return (((Procedure) obj).name.equals(name) &&
+                        ((Objekt.Procedure) obj).parameterList.size() == parameterList.size());
+            return super.equals(obj);
         }
     }
 

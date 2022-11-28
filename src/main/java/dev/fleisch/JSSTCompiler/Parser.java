@@ -451,7 +451,13 @@ public class Parser {
 
         // Check for local declarations -> possible types -> not possible statement
         while (!isEligibleForStatement()) {
-            symbolTable.add(parseLocalDeclaration());
+            Objekt.Parameter declaration = parseLocalDeclaration();
+            // Check if the parameters is already present within the  local symbol-table(redefinition)
+            for (Objekt obj : symbolTable) {
+                if (declaration.equals(obj))
+                    throw new ParserException("Variable redefinition: " + declaration.name, scanner);
+            }
+            symbolTable.add(declaration);
         }
 
         Node methodAST = parseStatementSequence();
@@ -566,7 +572,14 @@ public class Parser {
             // Parse further comma separated sections
             while (currentSymbol.equals(new Symbol<>(Keyword.COMMA))) {
                 assertKeyword(Keyword.COMMA);
-                parameters.add(parseFormalParameterSection());
+                Objekt.Parameter parameter = parseFormalParameterSection();
+
+                // Check if the parameter-name is already used within this method declaration
+                for (Objekt.Parameter p : parameters)
+                    if (p.equals(parameter))
+                        throw new ParserException("Variable name already used in this method declaration: " + parameter.name, scanner);
+
+                parameters.add(parameter);
             }
         }
 
@@ -615,7 +628,16 @@ public class Parser {
             // Assume the expression is a constant, try to evaluate it
             int value = parseExpression().evaluateConstantExpression();
 
-            symbolTable.push(new Objekt.Constant(identifier, type, value));
+            Objekt.Constant constant = new Objekt.Constant(identifier, type, value);
+
+            // Check if the constants name is already present within the  local symbol-table(redefinition)
+            for (Objekt obj : symbolTable) {
+                // check final overlapping
+                if (constant.equals(obj))
+                    throw new ParserException("Variable redefinition: " + identifier, scanner);
+            }
+
+            symbolTable.push(constant);
             assertKeyword(Keyword.SEMICOLON);
         }
 
@@ -624,14 +646,30 @@ public class Parser {
         while (currentSymbol.equals(new Symbol<>(Keyword.INT))) {
             Type type = parseType();
             String identifier = parseIdentifier();
+            Objekt.Parameter parameter = new Objekt.Parameter(identifier, type);
 
-            symbolTable.push(new Objekt.Parameter(identifier, type));
+            // Check if the parameters is already present within the  local symbol-table(redefinition)
+            for (Objekt obj : symbolTable) {
+                // check final overlapping
+                if (parameter.equals(obj) || (obj instanceof Objekt.Constant && obj.name.equals(identifier)))
+                    throw new ParserException("Variable redefinition: " + identifier, scanner);
+            }
+
+            symbolTable.push(parameter);
             assertKeyword(Keyword.SEMICOLON);
         }
 
         // { method_declaration }
         while (currentSymbol.equals(new Symbol<>(Keyword.PUBLIC))) {
-            symbolTable.push(parseMethodDeclaration(symbolTable));
+            Objekt.Procedure procedure = parseMethodDeclaration(symbolTable);
+
+            // Check if a procedure with same name and same parameter set is present
+            for (Objekt obj : symbolTable) {
+                if (procedure.equals(obj))
+                    throw new ParserException("Unambiguous method declaration for: " + procedure.name, scanner);
+            }
+
+            symbolTable.push(procedure);
         }
 
         return symbolTable;
@@ -763,7 +801,7 @@ public class Parser {
 
                 new Parser(temporaryScanner("() ;")).parseFormalParameters();
                 new Parser(temporaryScanner("(int i) ;")).parseFormalParameters();
-                new Parser(temporaryScanner("(int i, int i, int i) ;")).parseFormalParameters();
+                new Parser(temporaryScanner("(int i, int j, int k) ;")).parseFormalParameters();
 
                 new Parser(temporaryScanner("public int meth() ;")).parseMethodHead();
                 new Parser(temporaryScanner("public void meth(int i) ;")).parseMethodHead();
@@ -773,9 +811,9 @@ public class Parser {
                 new Parser(temporaryScanner("public void meth(){i=0;} ;")).parseMethodDeclaration(new SymbolTable());
 
                 new Parser(temporaryScanner("final int i = 0; ;")).parseDeclarations();
-                new Parser(temporaryScanner("final int i = 0; final int i = 0; ;")).parseDeclarations();
+                new Parser(temporaryScanner("final int i = 0; final int j = 0; ;")).parseDeclarations();
                 new Parser(temporaryScanner("int i; int j; ;")).parseDeclarations();
-                new Parser(temporaryScanner("int i; int j; int j; ;")).parseDeclarations();
+                new Parser(temporaryScanner("int i; int j; int k; ;")).parseDeclarations();
                 new Parser(temporaryScanner("final int i = 0; int j; ;")).parseDeclarations();
                 new Parser(temporaryScanner("final int i = 0; int j; public void meth(){i=0;};")).parseDeclarations();
 
