@@ -44,10 +44,9 @@ public class Parser {
     public void parse() throws ParserException, ScannerException, IOException {
         try {
             SymbolTable symbolTable = new SymbolTable();
-            Objekt.Clasz clasz = parseClass();
+            Objekt.Clasz clasz = parseClass(symbolTable);
             symbolTable.add(clasz);
             updateSyntaxTreeReferences(symbolTable);
-
         } catch (EOFException e) {
             throw new ParserException("Unexpected EOF");
         } catch (Exception e) {
@@ -509,13 +508,14 @@ public class Parser {
      * method_head method_body
      * </p>
      *
+     * @param enclosingTable The enclosing SymbolTable
      * @return The parsed method declaration
      */
     private Objekt.Procedure parseMethodDeclaration(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
 
-        Objekt.Procedure procedure = parseMethodHead();
+        Objekt.Procedure procedure = parseMethodHead(enclosingTable);
         Pair<SymbolTable, Node> pair = parseMethodBody(enclosingTable);
-        procedure.setSymbolTable(pair.first);
+        procedure.symbolTable.addAll(pair.first);
         procedure.setAbstractSyntaxTree(pair.second);
 
         return procedure;
@@ -527,16 +527,17 @@ public class Parser {
      * "public" method_type identifier formal_parameters
      * </p>
      *
+     * @param enclosingTable The enclosing SymbolTable
      * @return The Procedure described by this method head without a body
      */
 
-    private Objekt.Procedure parseMethodHead() throws ScannerException, IOException, ParserException {
+    private Objekt.Procedure parseMethodHead(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.PUBLIC);
         Type type = parseMethodType();
         String identifier = parseIdentifier();
         LinkedList<Objekt.Parameter> parameters = parseFormalParameters();
 
-        return new Objekt.Procedure(identifier, parameters, type);
+        return new Objekt.Procedure(identifier, parameters, type, new SymbolTable(enclosingTable));
     }
 
     /**
@@ -615,10 +616,11 @@ public class Parser {
      * { method_declaration }
      * </p>
      *
+     * @param enclosingTable The enclosing SymbolTable
      * @return Symbol table containing all parsed CONSTANTS, PARAMETERS and METHODS
      */
-    private SymbolTable parseDeclarations() throws ScannerException, IOException, ParserException {
-        SymbolTable symbolTable = new SymbolTable();
+    private SymbolTable parseDeclarations(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
+        SymbolTable symbolTable = new SymbolTable(enclosingTable);
 
         // check for { "final" type identifier "=" expression ";" }
         while (currentSymbol.equals(new Symbol<>(Keyword.FINAL))) {
@@ -685,12 +687,13 @@ public class Parser {
      * "{" declarations "}"
      * </p>
      *
+     * @param enclosingTable The enclosing SymbolTable
      * @return The symbolTable contained within this class body
      */
-    private SymbolTable parseClassBody() throws ScannerException, IOException, ParserException {
+    private SymbolTable parseClassBody(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
 
-        SymbolTable symbolTable = parseDeclarations();
+        SymbolTable symbolTable = parseDeclarations(enclosingTable);
 
         try {
             if (!currentSymbol.equals(new Symbol<>(Keyword.CURLY_CLOSING_BRACKET)))
@@ -708,11 +711,13 @@ public class Parser {
      * <p>
      * "class" identifier classbody
      * </p>
+     *
+     * @param enclosingTable The enclosing SymbolTable
      */
-    private Objekt.Clasz parseClass() throws ScannerException, IOException, ParserException {
+    private Objekt.Clasz parseClass(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.CLASS);
         String identifier = parseIdentifier();
-        SymbolTable symbolTable = parseClassBody();
+        SymbolTable symbolTable = parseClassBody(enclosingTable);
 
         return new Objekt.Clasz(identifier, symbolTable);
     }
@@ -818,7 +823,7 @@ public class Parser {
 
             if (obj instanceof Objekt.Clasz) {
                 // Resolve sub-classes
-                updateSyntaxTreeReferences(((Objekt.Clasz) obj).symboltable);
+                updateSyntaxTreeReferences(((Objekt.Clasz) obj).symbolTable);
             }
         }
     }
@@ -902,22 +907,22 @@ public class Parser {
                 new Parser(temporaryScanner("(int i) ;")).parseFormalParameters();
                 new Parser(temporaryScanner("(int i, int j, int k) ;")).parseFormalParameters();
 
-                new Parser(temporaryScanner("public int meth() ;")).parseMethodHead();
-                new Parser(temporaryScanner("public void meth(int i) ;")).parseMethodHead();
+                new Parser(temporaryScanner("public int meth() ;")).parseMethodHead(new SymbolTable());
+                new Parser(temporaryScanner("public void meth(int i) ;")).parseMethodHead(new SymbolTable());
 
                 new Parser(temporaryScanner("public int meth(){int i; int j; i=0; j=meth();} ;"))
                         .parseMethodDeclaration(new SymbolTable());
                 new Parser(temporaryScanner("public void meth(){i=0;} ;")).parseMethodDeclaration(new SymbolTable());
 
-                new Parser(temporaryScanner("final int i = 0; ;")).parseDeclarations();
-                new Parser(temporaryScanner("final int i = 0; final int j = 0; ;")).parseDeclarations();
-                new Parser(temporaryScanner("int i; int j; ;")).parseDeclarations();
-                new Parser(temporaryScanner("int i; int j; int k; ;")).parseDeclarations();
-                new Parser(temporaryScanner("final int i = 0; int j; ;")).parseDeclarations();
-                new Parser(temporaryScanner("final int i = 0; int j; public void meth(){i=0;};")).parseDeclarations();
+                new Parser(temporaryScanner("final int i = 0; ;")).parseDeclarations(new SymbolTable());
+                new Parser(temporaryScanner("final int i = 0; final int j = 0; ;")).parseDeclarations(new SymbolTable());
+                new Parser(temporaryScanner("int i; int j; ;")).parseDeclarations(new SymbolTable());
+                new Parser(temporaryScanner("int i; int j; int k; ;")).parseDeclarations(new SymbolTable());
+                new Parser(temporaryScanner("final int i = 0; int j; ;")).parseDeclarations(new SymbolTable());
+                new Parser(temporaryScanner("final int i = 0; int j; public void meth(){i=0;};")).parseDeclarations(new SymbolTable());
 
-                new Parser(temporaryScanner("{}")).parseClassBody();
-                new Parser(temporaryScanner("{ final int i = 0; }")).parseClassBody();
+                new Parser(temporaryScanner("{}")).parseClassBody(new SymbolTable());
+                new Parser(temporaryScanner("{ final int i = 0; }")).parseClassBody(new SymbolTable());
 
                 new Parser(temporaryScanner("class kek{}"));
                 new Parser(temporaryScanner("class kek{int i;}"));
