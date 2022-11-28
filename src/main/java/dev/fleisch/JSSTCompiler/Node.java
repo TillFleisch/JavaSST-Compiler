@@ -27,7 +27,7 @@ public abstract class Node {
     /**
      * Traverse the tree starting from this node(root)
      */
-    public void traverse(TraverseCallback traverseCallback) {
+    public void traverse(TraverseCallback traverseCallback) throws Exception {
         traverseCallback.onTraverse(this);
         if (left != null)
             left.traverse(traverseCallback);
@@ -132,6 +132,11 @@ public abstract class Node {
         String identifier;
 
         /**
+         * Reference to symbol table entry
+         */
+        Objekt symbolTableEntry = null;
+
+        /**
          * Constructor for identifier nodes
          *
          * @param identifier The identifiers name
@@ -139,6 +144,15 @@ public abstract class Node {
         public IdentifierNode(String identifier) {
             super(null, null);
             this.identifier = identifier;
+        }
+
+        /**
+         * Set the symbol table reference of this object
+         *
+         * @param symbolTableEntry Parameter from the symbolTable
+         */
+        public void setSymbolTableEntry(Objekt symbolTableEntry) {
+            this.symbolTableEntry = symbolTableEntry;
         }
 
         @Override
@@ -174,7 +188,7 @@ public abstract class Node {
         }
 
         @Override
-        public void traverse(TraverseCallback traverseCallback) {
+        public void traverse(TraverseCallback traverseCallback) throws Exception {
             condition.traverse(traverseCallback);
             super.traverse(traverseCallback);
         }
@@ -208,7 +222,7 @@ public abstract class Node {
         }
 
         @Override
-        public void traverse(TraverseCallback traverseCallback) {
+        public void traverse(TraverseCallback traverseCallback) throws Exception {
             condition.traverse(traverseCallback);
             super.traverse(traverseCallback);
         }
@@ -219,6 +233,12 @@ public abstract class Node {
      */
     public static class ProcedureCallNode extends Node {
 
+        /**
+         * Reference to symbol table entry
+         */
+        Objekt.Procedure symbolTableEntry = null;
+
+        String identifier;
 
         /**
          * Constructor for Procedure call nodes
@@ -227,12 +247,22 @@ public abstract class Node {
          * @param parameters The parameters to use for the procedure calls
          */
         public ProcedureCallNode(String identifier, StatementSequenceNode parameters) {
-            super(new IdentifierNode(identifier), parameters);
+            super(parameters, null);
+            this.identifier = identifier;
+        }
+
+        /**
+         * Set the symbol table reference of this object
+         *
+         * @param symbolTableEntry Procedure from the symbolTable
+         */
+        public void setSymbolTableEntry(Objekt.Procedure symbolTableEntry) {
+            this.symbolTableEntry = symbolTableEntry;
         }
 
         @Override
         public String toString() {
-            return "ProcedureCallNode";
+            return "ProcedureCallNode:\\l\t" + identifier;
         }
     }
 
@@ -260,7 +290,7 @@ public abstract class Node {
         }
 
         @Override
-        public void traverse(TraverseCallback traverseCallback) {
+        public void traverse(TraverseCallback traverseCallback) throws Exception {
             traverseCallback.onTraverse(this);
             for (Node statement : statements) {
                 statement.traverse(traverseCallback);
@@ -325,7 +355,7 @@ public abstract class Node {
          *
          * @param node The node begin traversed
          */
-        void onTraverse(Node node);
+        void onTraverse(Node node) throws Exception;
     }
 
     /**
@@ -333,7 +363,7 @@ public abstract class Node {
      *
      * @return Dot representation
      */
-    public String toDot() {
+    public String toDot() throws Exception {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("digraph ");
         stringBuilder.append(hashCode());

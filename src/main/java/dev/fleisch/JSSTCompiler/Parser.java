@@ -46,8 +46,12 @@ public class Parser {
             SymbolTable symbolTable = new SymbolTable();
             Objekt.Clasz clasz = parseClass();
             symbolTable.add(clasz);
+            updateSyntaxTreeReferences(symbolTable);
+
         } catch (EOFException e) {
             throw new ParserException("Unexpected EOF");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -724,6 +728,101 @@ public class Parser {
                 currentSymbol.equals(new Symbol<>(Keyword.WHILE)) ||
                 currentSymbol.equals(new Symbol<>(Keyword.RETURN));
     }
+
+    /**
+     * Update references within the AST such that they refer to the correct entry within the symbol table.
+     *
+     * @param symbolTable The symbol Table from which ASTs (from methods) should be retrieved
+     * @throws Exception If references could not be resolved
+     */
+    public void updateSyntaxTreeReferences(SymbolTable symbolTable) throws Exception {
+        // find all method declarations
+        for (Object obj : symbolTable) {
+            if (obj instanceof Objekt.Procedure) {
+                // Determine symbol table for the method
+                SymbolTable procedureSymbolTable = ((Objekt.Procedure) obj).symbolTable;
+
+                // Traverse the ast and update references
+                Node.TraverseCallback linkSymbolTables = node -> {
+                    // Link all Identifier nodes with their symbol table entry,
+                    // skip procedures, since those are handled separately
+                    if (node instanceof Node.IdentifierNode) {
+                        // find definition within the local scope, if not present proceed to a higher scope
+                        Node.IdentifierNode identifierNode = ((Node.IdentifierNode) node);
+                        SymbolTable currentSymbolTable = procedureSymbolTable;
+
+                        boolean foundLink = false;
+                        while (currentSymbolTable != null && !foundLink) {
+                            for (Objekt obj1 : currentSymbolTable) {
+                                // Find symbol table entry with same name
+                                if (identifierNode.identifier.equals(obj1.name)) {
+
+                                    // Skip method declarations
+                                    if (!(obj1 instanceof Objekt.Procedure)) {
+                                        identifierNode.setSymbolTableEntry(obj1);
+                                        foundLink = true;
+                                    }
+                                }
+                            }
+                            // Continue with the next (higher) scope
+                            currentSymbolTable = currentSymbolTable.enclosingTable;
+                        }
+
+                        if (!foundLink)
+                            throw new ParserException("Undefined variable: " + identifierNode.identifier);
+                    }
+
+                    // Check for Procedure calls
+                    if (node instanceof Node.ProcedureCallNode) {
+                        // Find matching method definition (same identifier and nr. of parameter)
+                        Node.ProcedureCallNode procedureCallNode = ((Node.ProcedureCallNode) node);
+                        SymbolTable currentSymbolTable = procedureSymbolTable;
+
+                        boolean foundLink = false;
+                        while (currentSymbolTable != null && !foundLink) {
+                            for (Objekt obj1 : currentSymbolTable) {
+                                // Find symbol table entry with same name
+                                if (obj1 instanceof Objekt.Procedure &&
+                                        procedureCallNode.identifier.equals(obj1.name)) {
+
+                                    if (((Objekt.Procedure) obj1).parameterList.size() ==
+                                            ((Node.StatementSequenceNode) procedureCallNode.left).statements.size()) {
+                                        procedureCallNode.setSymbolTableEntry((Objekt.Procedure) obj1);
+                                        foundLink = true;
+                                    }
+                                }
+                            }
+                            // Continue with the next (higher) scope
+                            currentSymbolTable = currentSymbolTable.enclosingTable;
+                        }
+
+                        if (!foundLink) {
+                            // fancy exception with corr. nr of parameters
+                            StringBuilder parameters = new StringBuilder("(");
+                            int nrParameter = ((Node.StatementSequenceNode) procedureCallNode.left).statements.size();
+                            for (int i = 0; i < nrParameter; i++) {
+                                parameters.append("int");
+                                if (i < nrParameter - 1)
+                                    parameters.append(",");
+                            }
+                            parameters.append(")");
+                            throw new ParserException("No matching Method found for: " + procedureCallNode.identifier
+                                    + parameters);
+                        }
+                    }
+
+                };
+
+                ((Objekt.Procedure) obj).abstractSyntaxTree.traverse(linkSymbolTables);
+            }
+
+            if (obj instanceof Objekt.Clasz) {
+                // Resolve sub-classes
+                updateSyntaxTreeReferences(((Objekt.Clasz) obj).symboltable);
+            }
+        }
+    }
+
 
     /**
      * Generic pair of 2 objects
