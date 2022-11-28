@@ -25,6 +25,20 @@ public abstract class Node {
     }
 
     /**
+     * Traverse the tree starting from this node(root)
+     */
+    public void traverse(TraverseCallback traverseCallback) {
+        traverseCallback.onTraverse(this);
+        if (left != null)
+            left.traverse(traverseCallback);
+        if (right != null)
+            right.traverse(traverseCallback);
+    }
+
+    @Override
+    public abstract String toString();
+
+    /**
      * Node for binary operations.
      */
     public static class BinaryOperationNode extends Node {
@@ -44,6 +58,11 @@ public abstract class Node {
         public BinaryOperationNode(Node left, Node right, Operation.Binary operation) {
             super(left, right);
             this.operation = operation;
+        }
+
+        @Override
+        public String toString() {
+            return "BinaryOperationNode:\\l\t" + operation.name();
         }
     }
 
@@ -68,6 +87,11 @@ public abstract class Node {
             super(left, null);
             this.operation = operation;
         }
+
+        @Override
+        public String toString() {
+            return "UnaryOperationNode:\\l\t" + operation.name();
+        }
     }
 
 
@@ -90,6 +114,11 @@ public abstract class Node {
             super(null, null);
             this.value = value;
         }
+
+        @Override
+        public String toString() {
+            return "ConstantNode:\\l\t" + value;
+        }
     }
 
     /**
@@ -110,6 +139,11 @@ public abstract class Node {
         public IdentifierNode(String identifier) {
             super(null, null);
             this.identifier = identifier;
+        }
+
+        @Override
+        public String toString() {
+            return "IdentifierNode:\\l\t" + identifier;
         }
     }
 
@@ -132,6 +166,17 @@ public abstract class Node {
         public WhileNode(Node condition, StatementSequenceNode statements) {
             super(statements, null);
             this.condition = condition;
+        }
+
+        @Override
+        public String toString() {
+            return "WhileNode";
+        }
+
+        @Override
+        public void traverse(TraverseCallback traverseCallback) {
+            condition.traverse(traverseCallback);
+            super.traverse(traverseCallback);
         }
     }
 
@@ -156,6 +201,17 @@ public abstract class Node {
             super(ifStatements, elseStatements);
             this.condition = condition;
         }
+
+        @Override
+        public String toString() {
+            return "IfNode";
+        }
+
+        @Override
+        public void traverse(TraverseCallback traverseCallback) {
+            condition.traverse(traverseCallback);
+            super.traverse(traverseCallback);
+        }
     }
 
     /**
@@ -172,6 +228,11 @@ public abstract class Node {
          */
         public ProcedureCallNode(String identifier, StatementSequenceNode parameters) {
             super(new IdentifierNode(identifier), parameters);
+        }
+
+        @Override
+        public String toString() {
+            return "ProcedureCallNode";
         }
     }
 
@@ -196,6 +257,30 @@ public abstract class Node {
         public StatementSequenceNode(List<Node> statements) {
             super(null, null);
             this.statements = statements;
+        }
+
+        @Override
+        public void traverse(TraverseCallback traverseCallback) {
+            traverseCallback.onTraverse(this);
+            for (Node statement : statements) {
+                statement.traverse(traverseCallback);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "StatementSequenceNode";
+        }
+
+        /**
+         * @return Hashcode of the fist child, if present, super.hashCode() otherwise
+         */
+        @Override
+        public int hashCode() {
+            if (statements.size() > 0) {
+                return statements.get(0).hashCode();
+            }
+            return super.hashCode();
         }
     }
 
@@ -228,5 +313,104 @@ public abstract class Node {
         }
 
         throw new ParserException("Evaluating constant failed! Non-constant found " + this.getClass());
+    }
+
+    /**
+     * Graph traversal callback
+     */
+    public interface TraverseCallback {
+
+        /**
+         * Called upon traversal
+         *
+         * @param node The node begin traversed
+         */
+        void onTraverse(Node node);
+    }
+
+    /**
+     * Determine the dot-representation for this node and it's children
+     *
+     * @return Dot representation
+     */
+    public String toDot() {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("digraph ");
+        stringBuilder.append(hashCode());
+        stringBuilder.append("{\n");
+
+        // Traverse graph and retrieve Node information
+        traverse(child -> {
+            stringBuilder.append(child.hashCode());
+            stringBuilder.append(" [label=\"");
+            stringBuilder.append(child);
+            stringBuilder.append("\"");
+            // Shape nodes according to type
+            if (child instanceof Node.IfNode || child instanceof Node.WhileNode) {
+                stringBuilder.append("shape=diamond");
+            } else if (child instanceof Node.ProcedureCallNode) {
+                stringBuilder.append("shape=csd");
+            } else if (child instanceof Node.UnaryOperationNode &&
+                    ((Node.UnaryOperationNode) child).operation == Operation.Unary.RETURN) {
+                stringBuilder.append("shape=oval");
+            } else {
+                stringBuilder.append("shape=box");
+            }
+            stringBuilder.append("]\n");
+        });
+
+        stringBuilder.append("\n\n");
+
+        // Traverse graph and retrieve edges
+        traverse(child -> {
+
+            // Add left and right sub-graphs
+            if (child.left != null) {
+                stringBuilder.append(child.hashCode());
+                stringBuilder.append("->");
+                stringBuilder.append(child.left.hashCode());
+                stringBuilder.append("[color=green]\n");
+            }
+
+            if (child.right != null) {
+                stringBuilder.append(child.hashCode());
+                stringBuilder.append("->");
+                stringBuilder.append(child.right.hashCode());
+                stringBuilder.append("[color=red]\n");
+            }
+
+            // Add condition sub-graph edges for while/if
+            if (child instanceof Node.IfNode || child instanceof Node.WhileNode) {
+                stringBuilder.append(child.hashCode());
+                stringBuilder.append("->");
+                if (child instanceof Node.IfNode) {
+                    stringBuilder.append(((Node.IfNode) child).condition.hashCode());
+                }
+                if (child instanceof Node.WhileNode) {
+                    stringBuilder.append(((Node.WhileNode) child).condition.hashCode());
+                }
+                stringBuilder.append("[color=blue]\n");
+            }
+
+            // add implicit edges from sequence nodes
+            if (child instanceof Node.StatementSequenceNode) {
+                List<Node> statements = ((Node.StatementSequenceNode) child).statements;
+
+                // Add edges between statement of Statement Sequence Nodes
+                for (int i = 0; i < statements.size(); i++) {
+                    stringBuilder.append(statements.get(i).hashCode());
+                    if (i < statements.size() - 1) {
+                        stringBuilder.append("->");
+                    }
+                }
+
+                if (statements.size() > 0)
+                    stringBuilder.append("[color=black]\n");
+            }
+
+        });
+
+        stringBuilder.append("}");
+        return stringBuilder.toString();
     }
 }
