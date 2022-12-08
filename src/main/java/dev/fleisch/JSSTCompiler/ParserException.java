@@ -27,9 +27,8 @@ public class ParserException extends Exception {
      *
      * @param message Exception message
      */
-    public ParserException(String message, Scanner scanner) {
-        super(message +
-                " at Line " + scanner.getLine() + ":" + scanner.getPosition());
+    public ParserException(String message, CodePosition codePosition) {
+        super(message + " at " + codePosition);
     }
 
     /**
@@ -40,24 +39,24 @@ public class ParserException extends Exception {
     static class ExpectedButFoundException extends ParserException {
 
 
-        public ExpectedButFoundException(Symbol<?> expected, Symbol<?> found, Scanner scanner) {
+        public ExpectedButFoundException(Symbol<?> expected, Symbol<?> found, CodePosition codePosition) {
             super("Expected '" +
                     ((expected.getType() != Symbol.Type.KEYWORD) ? expected.getType() : expected.content) +
                     "' but found " + found.toString() +
-                    " at Line " + scanner.getLine() + ":" + scanner.getPosition());
+                    " at " + codePosition);
         }
 
-        public ExpectedButFoundException(Keyword expected, Symbol<?> found, Scanner scanner) {
+        public ExpectedButFoundException(Keyword expected, Symbol<?> found, CodePosition codePosition) {
             super("Expected '" +
                     expected +
                     "' but found " + found.toString() +
-                    " at Line " + scanner.getLine() + ":" + scanner.getPosition());
+                    " at " + codePosition);
         }
 
-        public ExpectedButFoundException(Symbol.Type expected, Symbol<?> found, Scanner scanner) {
+        public ExpectedButFoundException(Symbol.Type expected, Symbol<?> found, CodePosition codePosition) {
             super("Expected '" + expected +
                     "' but found " + found.toString() +
-                    " at Line " + scanner.getLine() + ":" + scanner.getPosition());
+                    " at " + codePosition);
         }
 
     }

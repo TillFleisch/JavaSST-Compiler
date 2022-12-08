@@ -132,7 +132,7 @@ public class Scanner {
                         }
 
                     } catch (EOFException e) {
-                        throw new ScannerException("Unclosed comment at Line: " + input.getLine() + " Char: " + input.getPosition());
+                        throw new ScannerException("Unclosed comment at " + input.getPosition());
                     }
                     currentCharacter = input.next();
                     // Return symbol after comment
@@ -159,14 +159,14 @@ public class Scanner {
             } else {
                 // Throw an exception for unknown keywords
                 throw new ScannerException.UnknownSequenceException("Unknown character sequence encountered: " +
-                        substringBuilder + " at Line: " + input.getLine() + " Char: " + input.getPosition());
+                        substringBuilder + " at " + input.getPosition());
             }
 
         }
 
         // Throw an exception if we've encountered an unknown sequence
         throw new ScannerException.UnknownSequenceException("Unknown character sequence encountered: " +
-                currentCharacter + " at Line: " + input.getLine() + " Char: " + input.getPosition());
+                currentCharacter + " at " + input.getPosition());
     }
 
     /**
@@ -187,7 +187,7 @@ public class Scanner {
      * @return True if the character is considered a whitespace
      */
     private boolean isWhitespace(char c) {
-        return c == ' '|| c == '\t' || c == '\n' || c == '\r';
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r';
     }
 
     /**
@@ -212,22 +212,14 @@ public class Scanner {
     }
 
     /**
-     * Passes the input's line nr forward
-     *
-     * @return The scanners line nr within the source file
-     */
-    public int getLine() {
-        return input.getLine();
-    }
-
-    /**
-     * Passes the input's position forward
+     * Passes the input's code position
      *
      * @return The scanners position within the source file
      */
-    public int getPosition() {
+    public CodePosition getPosition() {
         return input.getPosition();
     }
+
 }
 
 /**

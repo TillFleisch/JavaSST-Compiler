@@ -40,13 +40,15 @@ public class Parser {
     /**
      * Parses a program and checks if it follows the given grammar.
      * <p>
+     * Parses a class and builds a symbolTable & AST combo for the parsed class
+     *
+     * @return The class object contained within the provided parser.
      **/
-    public void parse() throws ParserException, ScannerException, IOException {
+    public Objekt.Clasz parse() throws ParserException {
         try {
-            SymbolTable symbolTable = new SymbolTable();
-            Objekt.Clasz clasz = parseClass(symbolTable);
-            symbolTable.add(clasz);
-            updateSyntaxTreeReferences(symbolTable);
+            Objekt.Clasz clasz = parseClass();
+            updateSyntaxTreeReferences(clasz.symbolTable);
+            return clasz;
         } catch (EOFException e) {
             throw new ParserException("Unexpected EOF");
         } catch (Exception e) {
@@ -70,7 +72,7 @@ public class Parser {
     private void assertKeyword(Keyword keyword) throws ParserException.ExpectedButFoundException, ScannerException,
             IOException {
         if (!currentSymbol.equals(new Symbol<>(keyword)))
-            throw new ParserException.ExpectedButFoundException(keyword, currentSymbol, scanner);
+            throw new ParserException.ExpectedButFoundException(keyword, currentSymbol, scanner.getPosition());
         next();
     }
 
@@ -81,7 +83,7 @@ public class Parser {
      */
     private String parseIdentifier() throws ParserException.ExpectedButFoundException, ScannerException, IOException {
         if (!currentSymbol.getType().equals(Symbol.Type.IDENTIFIER))
-            throw new ParserException.ExpectedButFoundException(Symbol.Type.IDENTIFIER, currentSymbol, scanner);
+            throw new ParserException.ExpectedButFoundException(Symbol.Type.IDENTIFIER, currentSymbol, scanner.getPosition());
 
         String identifier = (String) currentSymbol.content;
         next();
@@ -96,7 +98,7 @@ public class Parser {
      */
     private int parseNumber() throws ParserException.ExpectedButFoundException, ScannerException, IOException {
         if (!currentSymbol.getType().equals(Symbol.Type.NUMBER))
-            throw new ParserException.ExpectedButFoundException(Symbol.Type.NUMBER, currentSymbol, scanner);
+            throw new ParserException.ExpectedButFoundException(Symbol.Type.NUMBER, currentSymbol, scanner.getPosition());
         int number = (int) currentSymbol.content;
         next();
         return number;
@@ -113,17 +115,20 @@ public class Parser {
     private Node parseFactor() throws ScannerException, IOException, ParserException {
 
         if (currentSymbol.getType() == Symbol.Type.NUMBER) {
-            return new Node.ConstantNode(parseNumber());
+            CodePosition constantPosition = new CodePosition(scanner.getPosition());
+            int number = parseNumber();
+            return new Node.ConstantNode(number, constantPosition);
         }
 
         if (currentSymbol.getType() == Symbol.Type.IDENTIFIER) {
+            CodePosition identifierPosition = new CodePosition(scanner.getPosition());
             String identifier = parseIdentifier();
             // differentiate stand-alone identifiers and procedure calls
             if (currentSymbol.equals(new Symbol<>(Keyword.ROUND_OPENING_BRACKET))) {
                 Node.StatementSequenceNode parameters = parseActualParameters();
-                return new Node.ProcedureCallNode(identifier, parameters);
+                return new Node.ProcedureCallNode(identifier, parameters, identifierPosition);
             }
-            return new Node.IdentifierNode(identifier);
+            return new Node.IdentifierNode(identifier, identifierPosition);
         }
 
         if (currentSymbol.equals(new Symbol<>(Keyword.ROUND_OPENING_BRACKET))) {
@@ -136,7 +141,7 @@ public class Parser {
             return subExpression;
         }
 
-        throw new ParserException("invalid factor", scanner);
+        throw new ParserException("invalid factor", scanner.getPosition());
     }
 
     /**
@@ -153,11 +158,12 @@ public class Parser {
      * @return Procedure call Node with identifier and parameters
      */
     private Node.ProcedureCallNode parseProcedureCall() throws ScannerException, ParserException, IOException {
+        CodePosition identifierPosition = new CodePosition(scanner.getPosition());
         String identifier = parseIdentifier();
         Node.StatementSequenceNode parameters = parseActualParameters();
         assertKeyword(Keyword.SEMICOLON);
 
-        return new Node.ProcedureCallNode(identifier, parameters);
+        return new Node.ProcedureCallNode(identifier, parameters, identifierPosition);
     }
 
     /**
@@ -186,7 +192,7 @@ public class Parser {
                     parameters.add(parseExpression());
                 }
             } catch (ParserException e) {
-                throw new ParserException("Bad Procedure call parameters", scanner);
+                throw new ParserException("Bad Procedure call parameters", scanner.getPosition());
             }
         }
 
@@ -215,18 +221,19 @@ public class Parser {
                 currentSymbol.equals(new Symbol<>(Keyword.GREATER)) ||
                 currentSymbol.equals(new Symbol<>(Keyword.GREATER_EQUAL))) {
             Operation.Binary binaryOperation;
+            CodePosition binaryOperationPosition = new CodePosition(scanner.getPosition());
             try {
                 // Determine the binary Operation
                 binaryOperation = Operation.Binary.toBinaryOperation((Keyword) currentSymbol.content);
             } catch (ParserException e) {
-                throw new ParserException(e.getMessage(), scanner);
+                throw new ParserException(e.getMessage(), scanner.getPosition());
             }
             next();
 
             Node secondExpression = parseSimpleExpression();
 
             // Return the simple expression as a binary operation with LHS and RHS subexpressions.
-            return new Node.BinaryOperationNode(firstExpression, secondExpression, binaryOperation);
+            return new Node.BinaryOperationNode(firstExpression, secondExpression, binaryOperation, binaryOperationPosition);
         }
 
         return firstExpression;
@@ -246,18 +253,19 @@ public class Parser {
         if (currentSymbol.equals(new Symbol<>(Keyword.PLUS)) ||
                 currentSymbol.equals(new Symbol<>(Keyword.MINUS))) {
             Operation.Binary binaryOperation;
+            CodePosition binaryOperationPosition = new CodePosition(scanner.getPosition());
             try {
                 // Determine the binary Operation
                 binaryOperation = Operation.Binary.toBinaryOperation((Keyword) currentSymbol.content);
             } catch (ParserException e) {
-                throw new ParserException(e.getMessage(), scanner);
+                throw new ParserException(e.getMessage(), scanner.getPosition());
             }
             next();
 
             // Resolve subsequent operand recursively
             Node secondTerm = parseSimpleExpression();
 
-            return new Node.BinaryOperationNode(firstTerm, secondTerm, binaryOperation);
+            return new Node.BinaryOperationNode(firstTerm, secondTerm, binaryOperation, binaryOperationPosition);
         }
         return firstTerm;
     }
@@ -277,17 +285,18 @@ public class Parser {
         if (currentSymbol.equals(new Symbol<>(Keyword.MULTIPLY)) ||
                 currentSymbol.equals(new Symbol<>(Keyword.DIVIDE))) {
             Operation.Binary binaryOperation;
+            CodePosition binaryOperationPosition = new CodePosition(scanner.getPosition());
             try {
                 // Determine the binary Operation
                 binaryOperation =
                         Operation.Binary.toBinaryOperation((Keyword) currentSymbol.content);
             } catch (ParserException e) {
-                throw new ParserException(e.getMessage(), scanner);
+                throw new ParserException(e.getMessage(), scanner.getPosition());
             }
             next();
             // Determine subsequent terms recursively
             Node secondFactor = parseTerm();
-            return new Node.BinaryOperationNode(firstFactor, secondFactor, binaryOperation);
+            return new Node.BinaryOperationNode(firstFactor, secondFactor, binaryOperation, binaryOperationPosition);
         }
         return firstFactor;
     }
@@ -320,6 +329,7 @@ public class Parser {
 
         // Check for identifier (assignment and procedure call)
         if (currentSymbol.getType() == Symbol.Type.IDENTIFIER) {
+            CodePosition identifierPosition = new CodePosition(scanner.getPosition());
             String identifier = parseIdentifier();
 
             // Check for assignment
@@ -328,7 +338,7 @@ public class Parser {
                 assertKeyword(Keyword.ASSIGN);
                 Node assignment = parseExpression();
                 assertKeyword(Keyword.SEMICOLON);
-                return new Node.BinaryOperationNode(new Node.IdentifierNode(identifier), assignment, Operation.Binary.ASSIGNMENT);
+                return new Node.BinaryOperationNode(new Node.IdentifierNode(identifier, identifierPosition), assignment, Operation.Binary.ASSIGNMENT, assignment.codePosition);
             }
 
             // Check for procedure call
@@ -336,12 +346,12 @@ public class Parser {
             if (currentSymbol.equals(new Symbol<>(Keyword.ROUND_OPENING_BRACKET))) {
                 Node.StatementSequenceNode parameters = parseActualParameters();
                 assertKeyword(Keyword.SEMICOLON);
-                return new Node.ProcedureCallNode(identifier, parameters);
+                return new Node.ProcedureCallNode(identifier, parameters, identifierPosition);
             }
 
-            throw new ParserException("Expected assignment or procedure call!", scanner);
+            throw new ParserException("Expected assignment or procedure call!", scanner.getPosition());
         }
-        throw new ParserException("Expected statement!", scanner);
+        throw new ParserException("Expected statement!", scanner.getPosition());
     }
 
     /**
@@ -353,16 +363,17 @@ public class Parser {
      * @return Syntax tree describing the parsed return statement
      */
     private Node parseReturn() throws ScannerException, IOException, ParserException {
+        CodePosition returnPosition = new CodePosition(scanner.getPosition());
         assertKeyword(Keyword.RETURN);
 
         // Check for optional parameters
         if (!currentSymbol.equals(new Symbol<>(Keyword.SEMICOLON))) {
             Node expression = parseSimpleExpression();
             assertKeyword(Keyword.SEMICOLON);
-            return new Node.UnaryOperationNode(expression, Operation.Unary.RETURN);
+            return new Node.UnaryOperationNode(expression, Operation.Unary.RETURN, returnPosition);
         }
         assertKeyword(Keyword.SEMICOLON);
-        return new Node.UnaryOperationNode(null, Operation.Unary.RETURN);
+        return new Node.UnaryOperationNode(null, Operation.Unary.RETURN, returnPosition);
     }
 
     /**
@@ -374,6 +385,7 @@ public class Parser {
      * @return Syntax tree describing the parsed if statement
      */
     private Node.WhileNode parseWhile() throws ScannerException, IOException, ParserException {
+        CodePosition whilePosition = new CodePosition(scanner.getPosition());
         assertKeyword(Keyword.WHILE);
         assertKeyword(Keyword.ROUND_OPENING_BRACKET);
         Node condition;
@@ -381,13 +393,13 @@ public class Parser {
             condition = parseExpression();
             assertKeyword(Keyword.ROUND_CLOSING_BRACKET);
         } catch (ParserException e) {
-            throw new ParserException("Bad while-condition", scanner);
+            throw new ParserException("Bad while-condition", scanner.getPosition());
         }
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
         Node.StatementSequenceNode node = parseStatementSequence();
         assertKeyword(Keyword.CURLY_CLOSING_BRACKET);
 
-        return new Node.StatementSequenceNode.WhileNode(condition, node);
+        return new Node.StatementSequenceNode.WhileNode(condition, node, whilePosition);
     }
 
     /**
@@ -399,6 +411,7 @@ public class Parser {
      * @return Syntax tree describing the parsed if statement
      */
     private Node.IfNode parseIf() throws ScannerException, IOException, ParserException {
+        CodePosition ifPosition = new CodePosition(scanner.getPosition());
         assertKeyword(Keyword.IF);
         assertKeyword(Keyword.ROUND_OPENING_BRACKET);
         Node condition;
@@ -406,7 +419,7 @@ public class Parser {
             condition = parseExpression();
             assertKeyword(Keyword.ROUND_CLOSING_BRACKET);
         } catch (ParserException e) {
-            throw new ParserException("Bad if-condition", scanner);
+            throw new ParserException("Bad if-condition", scanner.getPosition());
         }
         assertKeyword(Keyword.CURLY_OPENING_BRACKET);
         Node.StatementSequenceNode ifStatements = parseStatementSequence();
@@ -416,7 +429,7 @@ public class Parser {
         Node.StatementSequenceNode elseStatements = parseStatementSequence();
         assertKeyword(Keyword.CURLY_CLOSING_BRACKET);
 
-        return new Node.IfNode(condition, ifStatements, elseStatements);
+        return new Node.IfNode(condition, ifStatements, elseStatements, ifPosition);
     }
 
     /**
@@ -458,7 +471,7 @@ public class Parser {
             // Check if the parameters is already present within the  local symbol-table(redefinition)
             for (Objekt obj : symbolTable) {
                 if (declaration.equals(obj))
-                    throw new ParserException("Variable redefinition: " + declaration.name, scanner);
+                    throw new ParserException("Variable redefinition: " + declaration.name, scanner.getPosition());
             }
             symbolTable.add(declaration);
         }
@@ -498,7 +511,7 @@ public class Parser {
             next();
             return Type.INT;
         }
-        throw new ParserException("Expected type declaration", scanner);
+        throw new ParserException("Expected type declaration", scanner.getPosition());
     }
 
 
@@ -582,7 +595,7 @@ public class Parser {
                 // Check if the parameter-name is already used within this method declaration
                 for (Objekt.Parameter p : parameters)
                     if (p.equals(parameter))
-                        throw new ParserException("Variable name already used in this method declaration: " + parameter.name, scanner);
+                        throw new ParserException("Variable name already used in this method declaration: " + parameter.name, scanner.getPosition());
 
                 parameters.add(parameter);
             }
@@ -640,7 +653,7 @@ public class Parser {
             for (Objekt obj : symbolTable) {
                 // check final overlapping
                 if (constant.equals(obj))
-                    throw new ParserException("Variable redefinition: " + identifier, scanner);
+                    throw new ParserException("Variable redefinition: " + identifier, scanner.getPosition());
             }
 
             symbolTable.push(constant);
@@ -658,7 +671,7 @@ public class Parser {
             for (Objekt obj : symbolTable) {
                 // check final overlapping
                 if (parameter.equals(obj) || (obj instanceof Objekt.Constant && obj.name.equals(identifier)))
-                    throw new ParserException("Variable redefinition: " + identifier, scanner);
+                    throw new ParserException("Variable redefinition: " + identifier, scanner.getPosition());
             }
 
             symbolTable.push(parameter);
@@ -672,7 +685,7 @@ public class Parser {
             // Check if a procedure with same name and same parameter set is present
             for (Objekt obj : symbolTable) {
                 if (procedure.equals(obj))
-                    throw new ParserException("Unambiguous method declaration for: " + procedure.name, scanner);
+                    throw new ParserException("Unambiguous method declaration for: " + procedure.name, scanner.getPosition());
             }
 
             symbolTable.push(procedure);
@@ -697,7 +710,7 @@ public class Parser {
 
         try {
             if (!currentSymbol.equals(new Symbol<>(Keyword.CURLY_CLOSING_BRACKET)))
-                throw new ParserException.ExpectedButFoundException(Keyword.CURLY_CLOSING_BRACKET, currentSymbol, scanner);
+                throw new ParserException.ExpectedButFoundException(Keyword.CURLY_CLOSING_BRACKET, currentSymbol, scanner.getPosition());
             next();
         } catch (EOFException ignored) {
             // EOF is fine, since nothing is expected after curly closing bracket
@@ -711,13 +724,11 @@ public class Parser {
      * <p>
      * "class" identifier classbody
      * </p>
-     *
-     * @param enclosingTable The enclosing SymbolTable
      */
-    private Objekt.Clasz parseClass(SymbolTable enclosingTable) throws ScannerException, IOException, ParserException {
+    private Objekt.Clasz parseClass() throws ScannerException, IOException, ParserException {
         assertKeyword(Keyword.CLASS);
         String identifier = parseIdentifier();
-        SymbolTable symbolTable = parseClassBody(enclosingTable);
+        SymbolTable symbolTable = parseClassBody(new SymbolTable());
 
         return new Objekt.Clasz(identifier, symbolTable);
     }

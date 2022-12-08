@@ -16,14 +16,9 @@ public class Input {
     private final InputStream inputStream;
 
     /**
-     * The input stream's position within the file. (Line within the file)
+     * The input stream's position within the file.
      */
-    private int line = 1;
-
-    /**
-     * The input stream's position within the file. (Char on line)
-     */
-    private int position = 0;
+    private final CodePosition codePosition = new CodePosition(1, 0);
 
     /**
      * Determines if input is available
@@ -34,7 +29,7 @@ public class Input {
      * Creates a Input object for a given JavaSST source file
      *
      * @param filePath Path pointing to a JavaSST source file
-     * @throws FileNotFoundException
+     * @throws FileNotFoundException If the source file is not available
      */
     public Input(String filePath) throws FileNotFoundException {
         inputStream = new FileInputStream(filePath);
@@ -58,10 +53,10 @@ public class Input {
             char c = (char) inputStream.read();
 
             // Increase position and line to keep track of the streams position
-            position++;
+            codePosition.setColumn(codePosition.getColumn() + 1);
             if (c == '\n') {
-                position = 0;
-                line++;
+                codePosition.setColumn(0);
+                codePosition.setLine(codePosition.getLine() + 1);
             }
 
             return c;
@@ -77,21 +72,15 @@ public class Input {
      *
      * @return true if the input is still available
      */
-    public boolean available(){
+    public boolean available() {
         return available;
     }
 
     /**
      * @return The current position at which the input helper is within the file.
      */
-    public int getPosition() {
-        return position;
+    public CodePosition getPosition() {
+        return codePosition;
     }
 
-    /**
-     * @return The current line at which the input helper is within the file.
-     */
-    public int getLine() {
-        return line;
-    }
 }
