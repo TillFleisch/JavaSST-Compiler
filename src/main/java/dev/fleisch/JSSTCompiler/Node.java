@@ -9,9 +9,11 @@ import java.util.List;
  * @author TillFleisch
  */
 public abstract class Node {
-    Node left;
+    final Node left;
 
-    Node right;
+    final Node right;
+
+    private CodePosition codePosition;
 
     /**
      * Constructor for basic binary tree Notes.
@@ -22,6 +24,26 @@ public abstract class Node {
     public Node(Node left, Node right) {
         this.left = left;
         this.right = right;
+    }
+
+    /**
+     * Constructor for basic binary tree Notes.
+     *
+     * @param left         Left node
+     * @param right        Right node
+     * @param codePosition The Nodes position within the code
+     */
+    public Node(Node left, Node right, CodePosition codePosition) {
+        this.left = left;
+        this.right = right;
+        this.codePosition = codePosition;
+    }
+
+    /**
+     * @return this nodes Code position
+     */
+    public CodePosition getCodePosition() {
+        return codePosition;
     }
 
     /**
@@ -51,18 +73,19 @@ public abstract class Node {
         /**
          * Constructor for a binary operation node
          *
-         * @param left      LHS expression
-         * @param right     RHS expression
-         * @param operation The Operator for this Node
+         * @param left         LHS expression
+         * @param right        RHS expression
+         * @param operation    The Operator for this Node
+         * @param codePosition The Nodes position within the code
          */
-        public BinaryOperationNode(Node left, Node right, Operation.Binary operation) {
-            super(left, right);
+        public BinaryOperationNode(Node left, Node right, Operation.Binary operation, CodePosition codePosition) {
+            super(left, right, codePosition);
             this.operation = operation;
         }
 
         @Override
         public String toString() {
-            return "BinaryOperationNode:\\l\t" + operation.name();
+            return "BinaryOperationNode:\\l\t" + operation.name() + "\\l\t " + getCodePosition();
         }
     }
 
@@ -80,17 +103,18 @@ public abstract class Node {
         /**
          * Constructor for a unary operation node
          *
-         * @param left      Node to which the unary operator is applied
-         * @param operation Unary operation
+         * @param left         Node to which the unary operator is applied
+         * @param operation    Unary operation
+         * @param codePosition The Nodes position within the code
          */
-        public UnaryOperationNode(Node left, Operation.Unary operation) {
-            super(left, null);
+        public UnaryOperationNode(Node left, Operation.Unary operation, CodePosition codePosition) {
+            super(left, null, codePosition);
             this.operation = operation;
         }
 
         @Override
         public String toString() {
-            return "UnaryOperationNode:\\l\t" + operation.name();
+            return "UnaryOperationNode:\\l\t" + operation.name() + "\\l\t " + getCodePosition();
         }
     }
 
@@ -108,16 +132,17 @@ public abstract class Node {
         /**
          * Constructor for a constant
          *
-         * @param value The constant Nodes value
+         * @param value        The constant Nodes value
+         * @param codePosition The Nodes position within the code
          */
-        public ConstantNode(int value) {
-            super(null, null);
+        public ConstantNode(int value, CodePosition codePosition) {
+            super(null, null, codePosition);
             this.value = value;
         }
 
         @Override
         public String toString() {
-            return "ConstantNode:\\l\t" + value;
+            return "ConstantNode:\\l\t" + value + "\\l\t " + getCodePosition();
         }
     }
 
@@ -139,10 +164,11 @@ public abstract class Node {
         /**
          * Constructor for identifier nodes
          *
-         * @param identifier The identifiers name
+         * @param identifier   The identifiers name
+         * @param codePosition The Nodes position within the code
          */
-        public IdentifierNode(String identifier) {
-            super(null, null);
+        public IdentifierNode(String identifier, CodePosition codePosition) {
+            super(null, null, codePosition);
             this.identifier = identifier;
         }
 
@@ -157,7 +183,7 @@ public abstract class Node {
 
         @Override
         public String toString() {
-            return "IdentifierNode:\\l\t" + identifier;
+            return "IdentifierNode:\\l\t" + identifier + "\\l\t " + getCodePosition();
         }
     }
 
@@ -174,17 +200,18 @@ public abstract class Node {
         /**
          * Constructor for while Nodes
          *
-         * @param condition  The condition for this while Node
-         * @param statements The StatementSequence contained within the while loop
+         * @param condition    The condition for this while Node
+         * @param statements   The StatementSequence contained within the while loop
+         * @param codePosition The Nodes position within the code
          */
-        public WhileNode(Node condition, StatementSequenceNode statements) {
-            super(statements, null);
+        public WhileNode(Node condition, StatementSequenceNode statements, CodePosition codePosition) {
+            super(statements, null, codePosition);
             this.condition = condition;
         }
 
         @Override
         public String toString() {
-            return "WhileNode";
+            return "WhileNode" + "\\l\t " + getCodePosition();
         }
 
         @Override
@@ -210,15 +237,16 @@ public abstract class Node {
          * @param condition      The condition used in this if construct
          * @param ifStatements   The statement sequence to execute if the condition evaluates to true
          * @param elseStatements The statement sequence to execute of the condition evaluates to false
+         * @param codePosition   The Nodes position within the code
          */
-        public IfNode(Node condition, StatementSequenceNode ifStatements, StatementSequenceNode elseStatements) {
-            super(ifStatements, elseStatements);
+        public IfNode(Node condition, StatementSequenceNode ifStatements, StatementSequenceNode elseStatements, CodePosition codePosition) {
+            super(ifStatements, elseStatements, codePosition);
             this.condition = condition;
         }
 
         @Override
         public String toString() {
-            return "IfNode";
+            return "IfNode" + "\\l\t " + getCodePosition();
         }
 
         @Override
@@ -243,11 +271,12 @@ public abstract class Node {
         /**
          * Constructor for Procedure call nodes
          *
-         * @param identifier The procedures identifier
-         * @param parameters The parameters to use for the procedure calls
+         * @param identifier   The procedures identifier
+         * @param parameters   The parameters to use for the procedure calls
+         * @param codePosition The Nodes position within the code
          */
-        public ProcedureCallNode(String identifier, StatementSequenceNode parameters) {
-            super(parameters, null);
+        public ProcedureCallNode(String identifier, StatementSequenceNode parameters, CodePosition codePosition) {
+            super(parameters, null, codePosition);
             this.identifier = identifier;
         }
 
@@ -262,7 +291,7 @@ public abstract class Node {
 
         @Override
         public String toString() {
-            return "ProcedureCallNode:\\l\t" + identifier;
+            return "ProcedureCallNode:\\l\t" + identifier + "\\l\t " + getCodePosition();
         }
     }
 
@@ -294,6 +323,15 @@ public abstract class Node {
             traverseCallback.onTraverse(this);
             for (Node statement : statements) {
                 statement.traverse(traverseCallback);
+            }
+        }
+
+        @Override
+        public CodePosition getCodePosition() {
+            if (statements.size() > 0) {
+                return statements.get(0).getCodePosition();
+            } else {
+                return super.getCodePosition();
             }
         }
 

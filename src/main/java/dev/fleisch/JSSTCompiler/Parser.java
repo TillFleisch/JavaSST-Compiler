@@ -338,7 +338,7 @@ public class Parser {
                 assertKeyword(Keyword.ASSIGN);
                 Node assignment = parseExpression();
                 assertKeyword(Keyword.SEMICOLON);
-                return new Node.BinaryOperationNode(new Node.IdentifierNode(identifier, identifierPosition), assignment, Operation.Binary.ASSIGNMENT, assignment.codePosition);
+                return new Node.BinaryOperationNode(new Node.IdentifierNode(identifier, identifierPosition), assignment, Operation.Binary.ASSIGNMENT, assignment.getCodePosition());
             }
 
             // Check for procedure call
