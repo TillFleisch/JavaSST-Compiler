@@ -29,8 +29,12 @@ public class Main {
 
         try {
             Parser parser = new Parser(new Scanner(new Input("JavaSSTSourceCode/ParserTest.jsst")));
-            parser.parse();
-        } catch (ScannerException | ParserException | IOException e) {
+            Objekt.Clasz clasz = parser.parse();
+
+            SemanticAnalysis.run(clasz);
+
+            System.out.println(clasz.toDot(true, true, true));
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
