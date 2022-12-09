@@ -1,5 +1,7 @@
 package dev.fleisch.JSSTCompiler;
 
+import java.util.HashSet;
+
 /**
  * Class containing methods for semantic analysis of class objects.
  *
@@ -18,7 +20,8 @@ public class SemanticAnalysis {
         // Check all methods contained within the class
         for (Objekt objekt : clasz.symbolTable) {
             if (objekt instanceof Objekt.Procedure) {
-                Node.StatementSequenceNode ast = (Node.StatementSequenceNode) ((Objekt.Procedure) objekt).abstractSyntaxTree;
+                Objekt.Procedure procedure = (Objekt.Procedure) objekt;
+                Node.StatementSequenceNode ast = (Node.StatementSequenceNode) procedure.abstractSyntaxTree;
 
                 // Check if all operations are type-compatible
                 Node.TraverseCallback typeCompatibility = new Node.TraverseCallback() {
@@ -37,9 +40,21 @@ public class SemanticAnalysis {
                             containsUnreachableCode((Node.StatementSequenceNode) node);
                         }
 
+                        // Check for invalid assignments
+                        if (node instanceof Node.BinaryOperationNode &&
+                                ((Node.BinaryOperationNode) node).operation == Operation.Binary.ASSIGNMENT) {
+                            Node.IdentifierNode identifier = (Node.IdentifierNode) node.left;
+
+                            // Assignment to final variables
+                            if (identifier.symbolTableEntry instanceof Objekt.Constant) {
+                                throw new SemanticAnalysisException("Cannot assign final variable " +
+                                        identifier.symbolTableEntry.name, identifier.getCodePosition());
+                            }
+                        }
+
                         // Assert that all return actually return a value if required
                         if (node instanceof Node.UnaryOperationNode) {
-                            if (((Objekt.Procedure) objekt).returnType != Type.VOID &&
+                            if (procedure.returnType != Type.VOID &&
                                     ((Node.UnaryOperationNode) node).operation == Operation.Unary.RETURN)
                                 if (!doesReturnValue(node.left))
                                     throw new SemanticAnalysisException("Expected return value", node.getCodePosition());
@@ -53,7 +68,7 @@ public class SemanticAnalysis {
 
                 // Since we can't have unreachable code the last statement within a function must return a value
                 // This is also true for branches in case of an if statement / loop
-                if (((Objekt.Procedure) objekt).returnType != Type.VOID) {
+                if (procedure.returnType != Type.VOID) {
                     Node lastStatement = ast.statements.get(ast.statements.size() - 1);
                     boolean returns = false;
 
@@ -82,14 +97,168 @@ public class SemanticAnalysis {
 
                     if (!returns)
                         throw new SemanticAnalysisException("Expected return statement with argument for procedure "
-                                + objekt);
+                                + procedure);
 
                 }
+
+
+                // Check if variables are assigned before use
+
+                // Set containing available variables
+                // Add method arguments to the list as available parameters
+                HashSet<Objekt> variables = new HashSet<>(procedure.parameterList);
+
+                // Check if variables are used correctly within the procedure
+                checkTemporalConsistency((Node.StatementSequenceNode) procedure.abstractSyntaxTree, variables);
             }
         }
 
-        // TODO: check if identifier was assigned before use
     }
+
+
+    /**
+     * Recursively checks if variables are only used if they have been assigned before.
+     *
+     * @param statementSequenceNode statement sequence to check for validity
+     * @param variables             Set of variables which are available due to prior statements
+     * @return Set of variables available after all statements have been processed
+     * @throws SemanticAnalysisException If variables have been used before assignment
+     */
+    static HashSet<Objekt> checkTemporalConsistency(Node.StatementSequenceNode statementSequenceNode, HashSet<Objekt> variables) throws SemanticAnalysisException {
+
+        // Go through the statements and update entries within the variable map
+        for (Node statement : statementSequenceNode.statements) {
+
+            // Find all assignment statements
+            if (statement instanceof Node.BinaryOperationNode &&
+                    ((Node.BinaryOperationNode) statement).operation == Operation.Binary.ASSIGNMENT) {
+                Node.IdentifierNode identifier = (Node.IdentifierNode) statement.left;
+
+                // Check if assignment is valid and add it to set variables
+                if (identifier.symbolTableEntry instanceof Objekt.Parameter) {
+
+                    // Check if the assignment uses valid variables
+                    assertValidVariablesUsed(statement.right, variables);
+
+                    // Add the assigned variable to the set of assigned variables
+                    variables.add(identifier.symbolTableEntry);
+                }
+
+            }
+
+            // Check loop content
+            if (statement instanceof Node.WhileNode) {
+                // Check if the condition uses valid variables
+                assertValidVariablesUsed(((Node.WhileNode) statement).condition, variables);
+
+                // Check contained statements
+                checkTemporalConsistency((Node.StatementSequenceNode) statement.left,
+                        new HashSet<>(variables));
+
+                // Assume no variables are set during a loop (i.e. loop never entered)
+            }
+
+            // Check ifNode and includes variables which are available after both branches into the variable set
+            if (statement instanceof Node.IfNode) {
+
+                // Check if the condition uses valid variables
+                assertValidVariablesUsed(((Node.IfNode) statement).condition, variables);
+
+                // Check contained statements
+                HashSet<Objekt> ifBranchVariables = checkTemporalConsistency((Node.StatementSequenceNode) statement.left,
+                        new HashSet<>(variables));
+                HashSet<Objekt> elseBranchVariables = checkTemporalConsistency((Node.StatementSequenceNode) statement.right,
+                        new HashSet<>(variables));
+
+                // intersect both sets
+                ifBranchVariables.retainAll(elseBranchVariables);
+
+                // Add all variables which are available after both branches to the variable set
+                variables.addAll(ifBranchVariables);
+            }
+
+            // Check if parameters for procedure call are valid
+            if (statement instanceof Node.ProcedureCallNode) {
+
+                // Assert that all argument are valid
+                for (Node argument : ((Node.StatementSequenceNode) statement.left).statements) {
+                    assertValidVariablesUsed(argument, variables);
+                }
+            }
+
+
+        }
+        return variables;
+    }
+
+    /**
+     * Checks if a given expression only uses variables contained within the provided set
+     *
+     * @param node      Expression
+     * @param variables Set of valid variables to be used
+     * @throws SemanticAnalysisException If the expression uses invalid variables
+     */
+    static void assertValidVariablesUsed(Node node, HashSet<Objekt> variables) throws SemanticAnalysisException {
+        // Check statements used within condition
+        HashSet<Objekt> usedVariables = variablesUsedInExpression(node);
+
+        // Remove all valid variables
+        usedVariables.removeAll(variables);
+
+        // Throw exception for remaining non-final variables (have not been initialized)
+        for (Objekt variable : usedVariables) {
+            // Constant scope check not required for JavaSST
+            if (!(variable instanceof Objekt.Constant))
+                throw new SemanticAnalysisException("Variable " + variable.name + " might not have been initialized",
+                        node.getCodePosition());
+        }
+    }
+
+    /**
+     * Determines which variables are used within an Expression recursively
+     *
+     * @return Set of Variables used within an expression
+     */
+    static HashSet<Objekt> variablesUsedInExpression(Node node) throws SemanticAnalysisException {
+        HashSet<Objekt> variables = new HashSet<>();
+
+        // Return identifier (variable/ final variable) as is
+        if (node instanceof Node.IdentifierNode) {
+            variables.add(((Node.IdentifierNode) node).symbolTableEntry);
+            return variables;
+        }
+
+        // Return left/right branch recursively
+        if (node instanceof Node.BinaryOperationNode) {
+            variables.addAll(variablesUsedInExpression(node.left));
+            variables.addAll(variablesUsedInExpression(node.right));
+            return variables;
+        }
+
+        // Return branch recursively
+        if (node instanceof Node.UnaryOperationNode) {
+            variables.addAll(variablesUsedInExpression(node.left));
+            return variables;
+        }
+
+        // Add parameters for procedure call to variable list
+        if (node instanceof Node.ProcedureCallNode) {
+            Node.ProcedureCallNode procedureCallNode = (Node.ProcedureCallNode) node;
+            Node.StatementSequenceNode parameters = (Node.StatementSequenceNode) procedureCallNode.left;
+
+            for (Node parameter : parameters.statements)
+                variables.addAll(variablesUsedInExpression(parameter));
+            return variables;
+        }
+
+        // Empty set for constants
+        if (node instanceof Node.ConstantNode) {
+            return variables;
+        }
+
+        throw new SemanticAnalysisException("Invalid expression supplied for variable check");
+    }
+
 
     /**
      * Determines AST starting from the ast does return a expression value
