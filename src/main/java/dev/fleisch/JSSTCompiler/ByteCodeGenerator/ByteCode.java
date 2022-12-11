@@ -13,6 +13,7 @@ public enum ByteCode {
     IMUL(0x68),
     IDIV(0x6c),
     IF_ICMPEQ(0x9f),
+    IF_ICMPNE(0xa0),
     IF_ICMPLT(0xa1),
     IF_ICMPGE(0xa2),
     IF_ICMPGT(0xa3),

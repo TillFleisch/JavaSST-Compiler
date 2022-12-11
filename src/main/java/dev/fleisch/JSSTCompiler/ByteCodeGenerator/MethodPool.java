@@ -285,14 +285,14 @@ public class MethodPool extends Pool<Info.MethodInfo> {
         byte[] ifBranch = toByteCode(ifNode.getLeft(), localVariableIndices);
         byte[] elseBranch = toByteCode(ifNode.getRight(), localVariableIndices);
 
-        // Add the constant 1 onto the stack (value we compare against)
-        outputStream.write(ByteCode.ICONST_1.getCode());
+        // Add the constant 0 onto the stack (value we compare against)
+        outputStream.write(ByteCode.ICONST_0.getCode());
 
         // resolve the condition (this should put a value onto the stack)
         outputStream.write(toByteCode(ifNode.getCondition(), localVariableIndices));
 
         // compare value
-        outputStream.write(ByteCode.IF_ICMPEQ.getCode());
+        outputStream.write(ByteCode.IF_ICMPNE.getCode());
 
         // Write jump offset (skip else branch)
         short elseBranchSize = (short) (elseBranch.length + 3 + 3); // + ifcmp + goto
