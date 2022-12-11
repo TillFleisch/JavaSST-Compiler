@@ -146,6 +146,16 @@ public class SemanticAnalysis {
 
             }
 
+            // Find return statements
+            if (statement instanceof Node.UnaryOperationNode &&
+                    ((Node.UnaryOperationNode) statement).operation == Operation.Unary.RETURN) {
+                // If the return statement does return a value check if it has been initialized;
+                if (statement.left != null) {
+                    // Check if the assignment uses valid variables
+                    assertValidVariablesUsed(statement.left, variables);
+                }
+            }
+
             // Check loop content
             if (statement instanceof Node.WhileNode) {
                 // Check if the condition uses valid variables
