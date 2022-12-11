@@ -426,6 +426,149 @@ public abstract class Info {
             }
 
         }
+
+        /**
+         * Constructor for field reference information
+         * <p>
+         * CONSTANT_Fieldref_info
+         */
+        public static class FieldReferenceInfo extends ConstantPoolInfo {
+
+            /**
+             * Index of the Class containing the field within the constant pool
+             */
+            int classIndex;
+
+            /**
+             * Index of the nameAndType entry within the constant pool
+             */
+            int nameAndTypeIndex;
+
+            /**
+             * Constructor for field reference information
+             *
+             * @param classIndex       Index of the Class containing the field within the constant pool
+             * @param nameAndTypeIndex Index of the nameAndType entry within the constant pool
+             */
+            FieldReferenceInfo(int classIndex, int nameAndTypeIndex) {
+                super(9);
+                this.classIndex = classIndex;
+                this.nameAndTypeIndex = nameAndTypeIndex;
+            }
+
+            @Override
+            public byte[] toByteCode() {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+                // Write the tag
+                outputStream.write(tag);
+
+                // Write the class index
+                outputStream.write(classIndex >> 8);
+                outputStream.write(classIndex);
+
+                // Write name and type index
+                outputStream.write(nameAndTypeIndex >> 8);
+                outputStream.write(nameAndTypeIndex);
+
+                return outputStream.toByteArray();
+            }
+        }
+
+        /**
+         * Constructor for method reference information
+         * <p>
+         * CONSTANT_Fieldref_info
+         */
+        public static class MethodReferenceInfo extends ConstantPoolInfo {
+
+            /**
+             * Index of the Class containing the field within the constant pool
+             */
+            int classIndex;
+
+            /**
+             * Index of the nameAndType entry within the constant pool
+             */
+            int nameAndTypeIndex;
+
+            /**
+             * Constructor for field reference information
+             *
+             * @param classIndex       Index of the Class containing the field within the constant pool
+             * @param nameAndTypeIndex Index of the nameAndType entry within the constant pool
+             */
+            MethodReferenceInfo(int classIndex, int nameAndTypeIndex) {
+                super(10);
+                this.classIndex = classIndex;
+                this.nameAndTypeIndex = nameAndTypeIndex;
+            }
+
+            @Override
+            public byte[] toByteCode() {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+                // Write the tag
+                outputStream.write(tag);
+
+                // Write the class index
+                outputStream.write(classIndex >> 8);
+                outputStream.write(classIndex);
+
+                // Write name and type index
+                outputStream.write(nameAndTypeIndex >> 8);
+                outputStream.write(nameAndTypeIndex);
+
+                return outputStream.toByteArray();
+            }
+        }
+
+        /**
+         * Class describing Name and Type info
+         *
+         * <a href="https://docs.oracle.com/javase/specs/jvms/se6/html/ClassFile.doc.html#1327">CONSTANT_NameAndType_info</a>
+         *
+         * @author TillFleisch
+         */
+        public static class NameAndTypeInfo extends ConstantPoolInfo {
+
+            /**
+             * NameInfo for NameAndType info
+             */
+            int nameIndex;
+
+            /**
+             * Descriptor for NameAndType info
+             */
+            int descriptorIndex;
+
+            /**
+             * Constructor for NameAndTypeInfo
+             */
+            public NameAndTypeInfo(int nameIndex, int descriptorIndex) {
+                super(12);
+                this.nameIndex = nameIndex;
+                this.descriptorIndex = descriptorIndex;
+            }
+
+            @Override
+            public byte[] toByteCode() {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+                // Write tag
+                outputStream.write(tag);
+
+                // Write nameIndex
+                outputStream.write(nameIndex >> 8);
+                outputStream.write(nameIndex);
+
+                // Write descriptorIndex
+                outputStream.write(descriptorIndex >> 8);
+                outputStream.write(descriptorIndex);
+
+                return outputStream.toByteArray();
+            }
+        }
     }
 
 

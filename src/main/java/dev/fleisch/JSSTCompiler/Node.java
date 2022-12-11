@@ -40,6 +40,24 @@ public abstract class Node {
     }
 
     /**
+     * Return the left child of this Node
+     *
+     * @return left child
+     */
+    public Node getLeft() {
+        return left;
+    }
+
+    /**
+     * Return the right child of this Node
+     *
+     * @return right child
+     */
+    public Node getRight() {
+        return right;
+    }
+
+    /**
      * @return this nodes Code position
      */
     public CodePosition getCodePosition() {
@@ -83,6 +101,15 @@ public abstract class Node {
             this.operation = operation;
         }
 
+        /**
+         * Returns the operation this Node represents
+         *
+         * @return Operation used in this Node
+         */
+        public Operation.Binary getOperation() {
+            return operation;
+        }
+
         @Override
         public String toString() {
             return "BinaryOperationNode:\\l\t" + operation.name() + "\\l\t " + getCodePosition();
@@ -112,6 +139,15 @@ public abstract class Node {
             this.operation = operation;
         }
 
+        /**
+         * Returns the operation this Node represents
+         *
+         * @return Operation used in this Node
+         */
+        public Operation.Unary getOperation() {
+            return operation;
+        }
+
         @Override
         public String toString() {
             return "UnaryOperationNode:\\l\t" + operation.name() + "\\l\t " + getCodePosition();
@@ -138,6 +174,15 @@ public abstract class Node {
         public ConstantNode(int value, CodePosition codePosition) {
             super(null, null, codePosition);
             this.value = value;
+        }
+
+        /**
+         * Returns the value which this node holds
+         *
+         * @return Value represented by this constant
+         */
+        public int getValue() {
+            return value;
         }
 
         @Override
@@ -181,6 +226,15 @@ public abstract class Node {
             this.symbolTableEntry = symbolTableEntry;
         }
 
+        /**
+         * Returns the SymbolTable reference held by this Node
+         *
+         * @return This nodes SymbolTable reference
+         */
+        public Objekt getSymbolTableEntry() {
+            return symbolTableEntry;
+        }
+
         @Override
         public String toString() {
             return "IdentifierNode:\\l\t" + identifier + "\\l\t " + getCodePosition();
@@ -207,6 +261,15 @@ public abstract class Node {
         public WhileNode(Node condition, StatementSequenceNode statements, CodePosition codePosition) {
             super(statements, null, codePosition);
             this.condition = condition;
+        }
+
+        /**
+         * Returns the condition used in this While Node
+         *
+         * @return Condition Node
+         */
+        public Node getCondition() {
+            return condition;
         }
 
         @Override
@@ -242,6 +305,15 @@ public abstract class Node {
         public IfNode(Node condition, StatementSequenceNode ifStatements, StatementSequenceNode elseStatements, CodePosition codePosition) {
             super(ifStatements, elseStatements, codePosition);
             this.condition = condition;
+        }
+
+        /**
+         * Get the condition used in this if statement
+         *
+         * @return condition node
+         */
+        public Node getCondition() {
+            return condition;
         }
 
         @Override
@@ -289,6 +361,15 @@ public abstract class Node {
             this.symbolTableEntry = symbolTableEntry;
         }
 
+        /**
+         * Returns the SymbolTable reference held by this Node
+         *
+         * @return This nodes SymbolTable reference
+         */
+        public Objekt getSymbolTableEntry() {
+            return symbolTableEntry;
+        }
+
         @Override
         public String toString() {
             return "ProcedureCallNode:\\l\t" + identifier + "\\l\t " + getCodePosition();
@@ -316,6 +397,15 @@ public abstract class Node {
         public StatementSequenceNode(List<Node> statements) {
             super(null, null);
             this.statements = statements;
+        }
+
+        /**
+         * Returns the statements contained within this Node.
+         *
+         * @return List of statements contained within this Node
+         */
+        public List<Node> getStatements() {
+            return statements;
         }
 
         @Override

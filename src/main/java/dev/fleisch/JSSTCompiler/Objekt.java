@@ -60,7 +60,7 @@ public abstract class Objekt {
         public SymbolTable getSymbolTable() {
             return symbolTable;
         }
-        
+
         @Override
         public boolean equals(Object obj) {
             if (obj instanceof Clasz)
@@ -333,6 +333,15 @@ public abstract class Objekt {
          */
         public LinkedList<Parameter> getParameterList() {
             return parameterList;
+        }
+
+        /**
+         * Get the procedures SyntaxTee
+         *
+         * @return The procedures syntax tree
+         */
+        public Node getAbstractSyntaxTree() {
+            return abstractSyntaxTree;
         }
 
         /**

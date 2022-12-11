@@ -23,7 +23,7 @@ public abstract class Pool<T> extends LinkedList<T> {
      * @param objekt The objekt to find within the pool
      * @return Pool index for the given objekt
      */
-    public Integer getByReference(Objekt objekt) {
+    public int getByReference(Objekt objekt) {
         return poolReference.get(objekt);
     }
 

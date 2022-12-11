@@ -11,7 +11,7 @@ public abstract class Operation {
      *
      * @author TillFleisch
      */
-    enum Binary {
+    public enum Binary {
         ASSIGNMENT {
             @Override
             public int apply(int lhs, int rhs) throws IllegalCallerException {
@@ -104,7 +104,7 @@ public abstract class Operation {
      *
      * @author TillFleisch
      */
-    enum Unary {
+    public enum Unary {
         RETURN
     }
 }

@@ -54,15 +54,16 @@ public class FieldPool extends Pool<Info.FieldInfo> {
 
         // (public final static)
         add(new Info.FieldInfo(0x0001 | 0x0010 | 0x0008, nameIndex, descriptorIndex, attributes));
-        poolReference.put(constant, size() - 1);
+        poolReference.put(constant, size());
     }
 
     /**
      * Adds a variable to the field pool
      *
      * @param parameter variable to add
+     * @param clasz     Class in which the parameter is encapsulated
      */
-    public void add(Objekt.Parameter parameter) {
+    public void add(Objekt.Parameter parameter, Objekt.Clasz clasz) {
         // Constant name
         constantPool.add(new Info.ConstantPoolInfo.UTF8Info(parameter.getName()));
         int nameIndex = constantPool.size();
@@ -73,8 +74,21 @@ public class FieldPool extends Pool<Info.FieldInfo> {
         int descriptorIndex = constantPool.size();
 
         // (public)
-        add(new Info.FieldInfo(0x0001, nameIndex, descriptorIndex, new Info.AttributeInfo[]{}));
-        poolReference.put(parameter, size() - 1);
+        add(new Info.FieldInfo(0x0001 | 0x0008, nameIndex, descriptorIndex, new Info.AttributeInfo[]{}));
+        poolReference.put(parameter, size());
+
+        // Add CONSTANT_Fieldref_info used for static retrieval
+
+        // Retrieve constant pool
+        int classIndex = constantPool.getByReference(clasz);
+
+        // Add NameAndType info to the constant pool
+        constantPool.add(new Info.ConstantPoolInfo.NameAndTypeInfo(nameIndex, descriptorIndex));
+        int nameAndTypeIndex = constantPool.size();
+
+        // add a CONSTANT_Fieldref_info to the constant pool
+        constantPool.add(new Info.ConstantPoolInfo.FieldReferenceInfo(classIndex, nameAndTypeIndex));
+        constantPool.poolReference.put(parameter, constantPool.size());
     }
 
 }

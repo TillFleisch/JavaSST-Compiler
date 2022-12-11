@@ -53,7 +53,7 @@ public class ByteCodeGenerator {
      *
      * @param clasz Class on which the generator is based
      */
-    public ByteCodeGenerator(Objekt.Clasz clasz) {
+    public ByteCodeGenerator(Objekt.Clasz clasz) throws IOException {
         this.clasz = clasz;
 
         // Add the class to the pool
@@ -73,9 +73,18 @@ public class ByteCodeGenerator {
 
             // Add global variables to the field pool
             if (objekt instanceof Objekt.Parameter) {
-                fieldPool.add((Objekt.Parameter) objekt);
+                fieldPool.add((Objekt.Parameter) objekt, clasz);
             }
 
+            // add methods-references to the method Pool
+            // Method information is generated afterwards, since references might be required
+            if (objekt instanceof Objekt.Procedure) {
+                constantPool.add((Objekt.Procedure) objekt, clasz);
+            }
+        }
+
+        // Add methods (method information \w code)
+        for (Objekt objekt : clasz.getSymbolTable()) {
             // add methods to the method Pool
             if (objekt instanceof Objekt.Procedure) {
                 methodPool.add((Objekt.Procedure) objekt);

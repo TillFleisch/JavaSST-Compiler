@@ -57,6 +57,8 @@ public class Main {
                 byteCodeGenerator.generate().writeTo(fileOutputStream);
             }
 
+            System.out.println("\u001B[32mFile compiled successfully!\u001B[0m");
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
