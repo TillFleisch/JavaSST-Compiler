@@ -23,9 +23,18 @@ public abstract class Objekt {
     }
 
     /**
+     * retrieve the class name
+     *
+     * @return The class name
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
      * Class describing classes.
      */
-    static class Clasz extends Objekt {
+    public static class Clasz extends Objekt {
 
         /**
          * The {@link SymbolTable} used within this class.
@@ -43,6 +52,15 @@ public abstract class Objekt {
             this.symbolTable = symboltable;
         }
 
+        /**
+         * Returns the symbolTable used in this method
+         *
+         * @return SymbolTable used in this method
+         */
+        public SymbolTable getSymbolTable() {
+            return symbolTable;
+        }
+        
         @Override
         public boolean equals(Object obj) {
             if (obj instanceof Clasz)
@@ -156,7 +174,7 @@ public abstract class Objekt {
     /**
      * Class describing Parameters
      */
-    static class Parameter extends Objekt {
+    public static class Parameter extends Objekt {
 
         /**
          * The parameters name
@@ -191,7 +209,7 @@ public abstract class Objekt {
     /**
      * Class describing Constants
      */
-    static class Constant extends Parameter {
+    public static class Constant extends Parameter {
 
         /**
          * The constants value.
@@ -212,6 +230,15 @@ public abstract class Objekt {
             this.value = value;
         }
 
+        /**
+         * Get the constants value
+         *
+         * @return the constants value
+         */
+        public int getValue() {
+            return value;
+        }
+
         @Override
         public String toString() {
             return "Constant(final): " + name + "(" + type + "): " + value;
@@ -221,7 +248,7 @@ public abstract class Objekt {
     /**
      * Class describing Procedures
      */
-    static class Procedure extends Objekt {
+    public static class Procedure extends Objekt {
 
         /**
          * The procedure's return type.
@@ -279,6 +306,33 @@ public abstract class Objekt {
          */
         public void setSymbolTable(SymbolTable symbolTable) {
             this.symbolTable = symbolTable;
+        }
+
+        /**
+         * Returns the symbolTable used in this method
+         *
+         * @return SymbolTable used in this method
+         */
+        public SymbolTable getSymbolTable() {
+            return symbolTable;
+        }
+
+        /**
+         * Returns the type returned by this method
+         *
+         * @return The methods return type
+         */
+        public Type getReturnType() {
+            return returnType;
+        }
+
+        /**
+         * Returns the methods parameters
+         *
+         * @return List of parameters used in this method
+         */
+        public LinkedList<Parameter> getParameterList() {
+            return parameterList;
         }
 
         /**
