@@ -88,9 +88,21 @@ public class MethodPool extends Pool<Info.MethodInfo> {
         int numberOfVariables = procedure.getParameterList().size() + localVariableIndices.size();
 
         // Translate procedure ast/symbol-table into ByteCode
-        byte[] code = toByteCode(procedure.getAbstractSyntaxTree(), localVariableIndices);
 
-        return new Info.AttributeInfo.CodeAttribute(nameIndex, 0x000F, numberOfVariables, code);
+        ByteArrayOutputStream codeStream = new ByteArrayOutputStream();
+        codeStream.write(toByteCode(procedure.getAbstractSyntaxTree(), localVariableIndices));
+
+        if (procedure.getReturnType() == Type.VOID) {
+            // For void methods add a return just in case (implicit return)
+            codeStream.write(ByteCode.RETURN.getCode());
+        } else {
+            // otherwise add a mock return (last statement must be return) even if it is not reachable
+            codeStream.write(ByteCode.ICONST_0.getCode());
+            codeStream.write(ByteCode.IRETURN.getCode());
+        }
+
+        // TODO: determine max stack size
+        return new Info.AttributeInfo.CodeAttribute(nameIndex, 0xFFFF, numberOfVariables, codeStream.toByteArray());
     }
 
 
@@ -322,7 +334,7 @@ public class MethodPool extends Pool<Info.MethodInfo> {
             // Get variable being assigned
             Objekt.Parameter assignee = (Objekt.Parameter) ((Node.IdentifierNode) binaryOperationNode.getLeft()).getSymbolTableEntry();
 
-            // resolve assignee
+            // resolve assignment
             outputStream.write(toByteCode(binaryOperationNode.getRight(), localVariableIndices));
 
             // Store value, differentiate between local variable and static class variable
