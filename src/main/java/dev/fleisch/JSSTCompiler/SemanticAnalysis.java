@@ -106,7 +106,12 @@ public class SemanticAnalysis {
 
                 // Set containing available variables
                 // Add method arguments to the list as available parameters
+                // Add class variables to the list (might have been set by other methods, up to the user)
                 HashSet<Objekt> variables = new HashSet<>(procedure.parameterList);
+                for (Objekt obj : clasz.symbolTable)
+                    if (obj instanceof Objekt.Parameter && !(obj instanceof Objekt.Constant)) {
+                        variables.add(obj);
+                    }
 
                 // Check if variables are used correctly within the procedure
                 checkTemporalConsistency((Node.StatementSequenceNode) procedure.abstractSyntaxTree, variables);
