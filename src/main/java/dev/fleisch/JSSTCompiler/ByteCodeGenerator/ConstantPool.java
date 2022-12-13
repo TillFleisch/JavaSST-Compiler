@@ -3,12 +3,19 @@ package dev.fleisch.JSSTCompiler.ByteCodeGenerator;
 import dev.fleisch.JSSTCompiler.Objekt;
 import dev.fleisch.JSSTCompiler.Type;
 
+import java.util.HashMap;
+
 /**
  * Class describing a constant pool which holds ConstantPoolInformation
  *
  * @author TillFleisch
  */
 public class ConstantPool extends Pool<Info.ConstantPoolInfo> {
+
+    /**
+     * Map for easy integer constant to pool reference
+     */
+    final HashMap<Integer, Integer> constantReference = new HashMap<>();
 
     /**
      * Adds a clasz object to the Constant pool table
@@ -66,5 +73,20 @@ public class ConstantPool extends Pool<Info.ConstantPoolInfo> {
         // add a CONSTANT_Methodref_info to the constant pool
         add(new Info.ConstantPoolInfo.MethodReferenceInfo(classIndex, nameAndTypeIndex));
         poolReference.put(procedure, size());
+    }
+
+    /**
+     * Add constant ints to the constant pool
+     *
+     * @param value constant to add
+     */
+    public void add(int value) {
+
+        // Check if constant already present
+        if (!constantReference.containsKey(value)) {
+            // Add the constant to the constant pool
+            add(new Info.ConstantPoolInfo.IntegerInfo(value));
+            constantReference.put(value, size());
+        }
     }
 }

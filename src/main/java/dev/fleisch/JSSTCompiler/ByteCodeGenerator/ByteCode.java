@@ -24,6 +24,7 @@ public enum ByteCode {
     PUTSTATIC(0xb3),
     BIPUSH(0x10),
     SIPUSH(0x11),
+    LDC(0x12),
     GOTO(0xa7),
     INVOKESTATIC(0xb8),
     RETURN(0xb1),

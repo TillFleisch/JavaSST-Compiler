@@ -1,5 +1,6 @@
 package dev.fleisch.JSSTCompiler.ByteCodeGenerator;
 
+import dev.fleisch.JSSTCompiler.Node;
 import dev.fleisch.JSSTCompiler.Objekt;
 import dev.fleisch.JSSTCompiler.SymbolTable;
 
@@ -53,7 +54,7 @@ public class ByteCodeGenerator {
      *
      * @param clasz Class on which the generator is based
      */
-    public ByteCodeGenerator(Objekt.Clasz clasz) throws IOException {
+    public ByteCodeGenerator(Objekt.Clasz clasz) throws Exception {
         this.clasz = clasz;
 
         // Add the class to the pool
@@ -68,6 +69,11 @@ public class ByteCodeGenerator {
             // Add constants to the field pool
             if (objekt instanceof Objekt.Constant) {
                 fieldPool.add((Objekt.Constant) objekt);
+
+                // Add it to the constant pool if it's larger than 2 bytes
+                int constant = ((Objekt.Constant) objekt).getValue();
+                if (constant > 32767 || constant < -32767)
+                    constantPool.add(constant);
                 continue;
             }
 
@@ -80,6 +86,27 @@ public class ByteCodeGenerator {
             // Method information is generated afterwards, since references might be required
             if (objekt instanceof Objekt.Procedure) {
                 constantPool.add((Objekt.Procedure) objekt, clasz);
+            }
+        }
+
+        // Add all variables into the constant pool
+        for (Objekt objekt : clasz.getSymbolTable()) {
+            // add methods to the method Pool
+            if (objekt instanceof Objekt.Procedure) {
+                Node ast = ((Objekt.Procedure) objekt).getAbstractSyntaxTree();
+
+                ast.traverse(new Node.TraverseCallback() {
+                    @Override
+                    public void onTraverse(Node node) {
+                        if (node instanceof Node.ConstantNode) {
+                            int constant = ((Node.ConstantNode) node).getValue();
+
+                            // add the constant if it's to large for SIPUSH
+                            if (constant > 32767 || constant < -32767)
+                                constantPool.add(constant);
+                        }
+                    }
+                });
             }
         }
 

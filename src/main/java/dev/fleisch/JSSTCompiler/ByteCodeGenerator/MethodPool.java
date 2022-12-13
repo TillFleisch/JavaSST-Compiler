@@ -155,11 +155,7 @@ public class MethodPool extends Pool<Info.MethodInfo> {
         if (node instanceof Node.ConstantNode) {
             Node.ConstantNode constantNode = (Node.ConstantNode) node;
 
-            // Push the constant value onto the stack
-            outputStream.write(ByteCode.BIPUSH.getCode());
-            outputStream.write(constantNode.getValue());
-            return outputStream.toByteArray();
-            // TODO: figure out how constant larger than 1 byte work
+            return loadConstant(constantNode.getValue());
         }
 
         // Translate identifiers (load operations)
@@ -411,12 +407,7 @@ public class MethodPool extends Pool<Info.MethodInfo> {
         if (identifierNode.getSymbolTableEntry() instanceof Objekt.Constant) {
             Objekt.Constant constant = (Objekt.Constant) identifierNode.getSymbolTableEntry();
 
-            // TODO: figure out how constant larger than 1 byte work
-
-            // Push the constant value onto the stack
-            outputStream.write(ByteCode.BIPUSH.getCode());
-            outputStream.write(constant.getValue());
-            return outputStream.toByteArray();
+            return loadConstant(constant.getValue());
         }
 
         // Translate variables (load variable value onto stack)
@@ -436,6 +427,39 @@ public class MethodPool extends Pool<Info.MethodInfo> {
                 outputStream.write(staticIndex);
             }
         }
+        return outputStream.toByteArray();
+    }
+
+    /**
+     * Loads a constant onto the stack using the correct operation
+     *
+     * @param constant constant to load
+     * @return ByteCode loading the constant
+     */
+    public byte[] loadConstant(int constant) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        // Use BIPUSH if it's sufficient
+        if (constant < 127 && constant > -127) {
+            outputStream.write(ByteCode.BIPUSH.getCode());
+            outputStream.write(constant);
+            return outputStream.toByteArray();
+        }
+
+        // Use SIPUSH if it's sufficient
+        if (constant < 32767 && constant > -32767) {
+            outputStream.write(ByteCode.SIPUSH.getCode());
+            outputStream.write(constant >> 8);
+            outputStream.write(constant);
+            return outputStream.toByteArray();
+        }
+
+        // Find constant index within constant pool
+        int constantIndex = constantPool.constantReference.get(constant);
+
+        // Push the constant value onto the stack
+        outputStream.write(ByteCode.LDC.getCode());
+        outputStream.write(constantIndex);
         return outputStream.toByteArray();
     }
 }
