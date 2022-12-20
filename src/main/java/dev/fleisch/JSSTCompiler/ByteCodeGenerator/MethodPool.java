@@ -36,7 +36,7 @@ public class MethodPool extends Pool<Info.MethodInfo> {
      *
      * @param procedure Method to add
      */
-    public void add(Objekt.Procedure procedure) throws IOException {
+    public void add(Objekt.Procedure procedure) throws Exception {
 
         // Constant name
         constantPool.add(new Info.ConstantPoolInfo.UTF8Info(procedure.getName()));
@@ -68,7 +68,7 @@ public class MethodPool extends Pool<Info.MethodInfo> {
      * @param procedure Method on which the CodeAttribute is based
      * @return Code attribute containing Bytecode for the given method.
      */
-    Info.AttributeInfo.CodeAttribute generateCodeAttribute(Objekt.Procedure procedure) throws IOException {
+    Info.AttributeInfo.CodeAttribute generateCodeAttribute(Objekt.Procedure procedure) throws Exception {
 
         // Constant name
         constantPool.add(new Info.ConstantPoolInfo.UTF8Info("Code"));
