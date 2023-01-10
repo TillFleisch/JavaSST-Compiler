@@ -1,11 +1,10 @@
 package dev.fleisch.JSSTCompiler.ByteCodeGenerator;
 
-import dev.fleisch.JSSTCompiler.Node;
-import dev.fleisch.JSSTCompiler.Objekt;
-import dev.fleisch.JSSTCompiler.SymbolTable;
+import dev.fleisch.JSSTCompiler.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.LinkedList;
 
 
 /**
@@ -14,7 +13,6 @@ import java.io.IOException;
  * @author TillFleisch
  */
 public class ByteCodeGenerator {
-
 
     /**
      * Clasz to generate bytecode for
@@ -68,7 +66,7 @@ public class ByteCodeGenerator {
 
             // Add constants to the field pool
             if (objekt instanceof Objekt.Constant) {
-                fieldPool.add((Objekt.Constant) objekt);
+                fieldPool.add((Objekt.Constant) objekt, clasz);
 
                 // Add it to the constant pool if it's larger than 2 bytes
                 int constant = ((Objekt.Constant) objekt).getValue();
@@ -118,6 +116,57 @@ public class ByteCodeGenerator {
             }
         }
 
+        // Create mock default constructor
+        Objekt.Procedure defaultConstructor = new Objekt.Procedure("<init>", new LinkedList<>(), Type.VOID);
+
+        // Create a mock super procedure with class object class reference
+        Objekt.Procedure mockProcedure = new Objekt.Procedure("<init>", new LinkedList<>(), Type.VOID);
+        constantPool.add(mockProcedure, objectClass);
+
+        // Create mock procedure call
+        Node.ProcedureCallNode mockCall = new Node.ProcedureCallNode("<init>", new Node.StatementSequenceNode(new LinkedList<>()), new CodePosition(0, 0));
+        mockCall.setSymbolTableEntry(mockProcedure);
+
+        // Add final variable initialization
+        Node.StatementSequenceNode statementSequence = initializeGlobals(clasz);
+
+        // Add mock super call at start of procedure
+        statementSequence.getStatements().add(0, mockCall);
+
+        // Add default constructor
+        defaultConstructor.setAbstractSyntaxTree(statementSequence);
+        methodPool.add(defaultConstructor);
+    }
+
+    /**
+     * Generates an AST which initializes non-static final variables.
+     *
+     * @param clasz Class for which finals will be initialized
+     * @return StatementSequenceNode containing assignments
+     */
+
+    Node.StatementSequenceNode initializeGlobals(Objekt.Clasz clasz) {
+        LinkedList<Node> output = new LinkedList<>();
+
+        // Find all final variables and create mock assignments
+        for (Objekt objekt : clasz.getSymbolTable()) {
+            // Add constants to the field pool
+            if (objekt instanceof Objekt.Constant) {
+                Objekt.Constant constant = (Objekt.Constant) objekt;
+
+                // Mock identifier for variable being assigned
+                Node.IdentifierNode assignee = new Node.IdentifierNode(constant.getName(), new CodePosition(0, 0));
+                assignee.setSymbolTableEntry(constant);
+
+                // Create mock variable assignment
+                output.add(new Node.BinaryOperationNode(assignee,
+                        new Node.ConstantNode(constant.getValue(), new CodePosition(0, 0)),
+                        Operation.Binary.ASSIGNMENT,
+                        new CodePosition(0, 0)));
+            }
+        }
+
+        return new Node.StatementSequenceNode(output);
     }
 
     /**

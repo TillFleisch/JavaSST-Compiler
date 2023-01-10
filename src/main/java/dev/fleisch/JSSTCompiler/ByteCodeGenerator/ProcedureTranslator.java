@@ -60,8 +60,8 @@ public class ProcedureTranslator {
             }
         }
 
-        // Determine how many local variables exist
-        maxLocals = procedure.getParameterList().size() + localVariableIndices.size();
+        // Determine how many local variables exist (+1 object reference)
+        maxLocals = procedure.getParameterList().size() + localVariableIndices.size() + 1;
 
         // Translate procedure AST into bytecode recursively
         bytecode = toByteCode(procedure.getAbstractSyntaxTree());
@@ -218,6 +218,10 @@ public class ProcedureTranslator {
 
         Node.StatementSequenceNode parameters = (Node.StatementSequenceNode) procedureCallNode.getLeft();
 
+        // Load object reference
+        outputStream.write(ByteCode.ALOAD_0.getCode());
+        incrementStackSize(1);
+
         // Translate all parameters and leave them on the stack
         for (Node statement : parameters.getStatements()) {
             // Implicitly also adds parameters to the stack counter
@@ -226,14 +230,17 @@ public class ProcedureTranslator {
 
         Objekt.Procedure symbolTableEntry = (Objekt.Procedure) procedureCallNode.getSymbolTableEntry();
 
-        // Write invoke static (find index in constant Pool)
-        outputStream.write(ByteCode.INVOKESTATIC.getCode());
+        // Write invoke (find index in constant Pool)
+        // Constructor requires special call
+        outputStream.write(procedureCallNode.getSymbolTableEntry().getName().contains("init")
+                ? ByteCode.INVOKESPECIAL.getCode()
+                : ByteCode.INVOKEVIRTUAL.getCode());
         short methodIndex = (short) constantPool.getByReference(symbolTableEntry);
         outputStream.write(methodIndex >> 8);
         outputStream.write(methodIndex);
 
-        // Remove nr. of parameters from the stack counter
-        decrementStackSize(parameters.getStatements().size());
+        // Remove nr. of parameters from the stack counter (+ 1 aload)
+        decrementStackSize(parameters.getStatements().size() + 1);
 
         // Add return value to stack if it does return a value
         incrementStackSize(symbolTableEntry.getReturnType() == Type.VOID ? 0 : 1);
@@ -363,19 +370,29 @@ public class ProcedureTranslator {
             // Get variable being assigned
             Objekt.Parameter assignee = (Objekt.Parameter) ((Node.IdentifierNode) binaryOperationNode.getLeft()).getSymbolTableEntry();
 
-            // resolve assignment
-            outputStream.write(toByteCode(binaryOperationNode.getRight()));
-
             // Store value, differentiate between local variable and static class variable
             if (localVariableIndices.contains(assignee)) {
-                // Reference local variable via index
+                // resolve assignment
+                outputStream.write(toByteCode(binaryOperationNode.getRight()));
+
+                // Reference local variable via index (+1 offset objectReference)
                 outputStream.write(ByteCode.ISTORE.getCode());
-                outputStream.write(localVariableIndices.indexOf(assignee));
+                outputStream.write(localVariableIndices.indexOf(assignee) + 1);
             } else {
-                // put static class variable via put static and constant pool reference
-                outputStream.write(ByteCode.PUTSTATIC.getCode());
+                // Load object reference
+                outputStream.write(ByteCode.ALOAD_0.getCode());
+                incrementStackSize(1);
+
+                // resolve assignment
+                outputStream.write(toByteCode(binaryOperationNode.getRight()));
+
+                // put class variable and constant pool reference
+                outputStream.write(ByteCode.PUTFIELD.getCode());
                 outputStream.write(constantPool.getByReference(assignee) >> 8);
                 outputStream.write(constantPool.getByReference(assignee));
+
+                // remove aload reference
+                decrementStackSize(1);
             }
 
             // Remove stored value from stack counter
@@ -453,17 +470,21 @@ public class ProcedureTranslator {
         if (identifierNode.getSymbolTableEntry() instanceof Objekt.Parameter) {
             Objekt.Parameter variable = (Objekt.Parameter) identifierNode.getSymbolTableEntry();
 
-            // Differentiate between local & static global variables
+            // Differentiate between local & global variables
             if (localVariableIndices.contains(variable)) {
-                // Reference local variable via index
+                // Reference local variable via index (+1 offset objectReference)
                 outputStream.write(ByteCode.ILOAD.getCode());
-                outputStream.write(localVariableIndices.indexOf(variable));
+                outputStream.write(localVariableIndices.indexOf(variable) + 1);
             } else {
-                // get static class variable via get static and constant pool reference
-                outputStream.write(ByteCode.GETSTATIC.getCode());
-                int staticIndex = constantPool.getByReference(variable); // get index from pool
-                outputStream.write(staticIndex >> 8);
-                outputStream.write(staticIndex);
+                // Load object reference
+                outputStream.write(ByteCode.ALOAD_0.getCode());
+                incrementStackSize(1);
+                // get variable via get field and constant pool reference
+                outputStream.write(ByteCode.GETFIELD.getCode());
+                int index = constantPool.getByReference(variable); // get index from pool
+                outputStream.write(index >> 8);
+                outputStream.write(index);
+                decrementStackSize(1);
             }
             incrementStackSize(1);
         }

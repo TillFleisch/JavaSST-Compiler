@@ -6,6 +6,7 @@ package dev.fleisch.JSSTCompiler.ByteCodeGenerator;
  * @author TillFleisch
  */
 public enum ByteCode {
+    ALOAD_0(0x2a),
     ICONST_0(0x3),
     ICONST_1(0x4),
     IADD(0x60),
@@ -22,11 +23,15 @@ public enum ByteCode {
     ISTORE(0x36),
     GETSTATIC(0xb2),
     PUTSTATIC(0xb3),
+    PUTFIELD(0xb5),
+    GETFIELD(0xb4),
     BIPUSH(0x10),
     SIPUSH(0x11),
     LDC(0x12),
     GOTO(0xa7),
     INVOKESTATIC(0xb8),
+    INVOKEVIRTUAL(0xb6),
+    INVOKESPECIAL(0xb7),
     RETURN(0xb1),
     IRETURN(0xac);
 

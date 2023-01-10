@@ -35,8 +35,8 @@ public abstract class Info {
     public static class MethodInfo extends FieldBase {
 
         MethodInfo(int nameIndex, int descriptorIndex, AttributeInfo[] attributes) {
-            // Method flags as public static
-            super(0x0001 | 0x0008, nameIndex, descriptorIndex, attributes);
+            // Method flags as public
+            super(0x0001, nameIndex, descriptorIndex, attributes);
         }
     }
 

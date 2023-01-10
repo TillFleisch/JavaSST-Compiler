@@ -24,7 +24,7 @@ public class FieldPool extends Pool<Info.FieldInfo> {
     }
 
     /**
-     * Adds a constant (final variable) to the field pool
+     * Adds a static constant (final variable) to the field pool
      *
      * @param constant The constant to add
      */
@@ -74,7 +74,7 @@ public class FieldPool extends Pool<Info.FieldInfo> {
         int descriptorIndex = constantPool.size();
 
         // (public)
-        add(new Info.FieldInfo(0x0001 | 0x0008, nameIndex, descriptorIndex, new Info.AttributeInfo[]{}));
+        add(new Info.FieldInfo(0x0001, nameIndex, descriptorIndex, new Info.AttributeInfo[]{}));
         poolReference.put(parameter, size());
 
         // Add CONSTANT_Fieldref_info used for static retrieval
