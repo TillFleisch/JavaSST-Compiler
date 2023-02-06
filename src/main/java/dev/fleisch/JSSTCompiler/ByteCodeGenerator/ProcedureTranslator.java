@@ -142,6 +142,14 @@ public class ProcedureTranslator {
             for (Node statement : statementSequenceNode.getStatements()) {
                 // Translate statement
                 sequenceStream.write(toByteCode(statement));
+
+                if(statement instanceof Node.ProcedureCallNode){
+                    Objekt.Procedure procedure = (Objekt.Procedure) ((Node.ProcedureCallNode)statement).getSymbolTableEntry();
+                    // Method returns value but value is not used
+                    if(procedure.getReturnType()!=Type.VOID){
+                        decrementStackSize(1);
+                    }
+                }
             }
 
             // Write statements to output
